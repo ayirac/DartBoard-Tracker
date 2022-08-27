@@ -2,11 +2,9 @@
 #include "Library.h"
 #include <iostream>
 
-DartBoard::DartBoard() : snapshot_taken_(false), segment_lines_calibrated_(false), doubles_calibrated_(false), triples_calibrated_(false), outer_bullseye_calibrated_(false), inner_bullseye_calibrated_(false)
+DartBoard::DartBoard() : c_state_(0)
 {
 }
-
-bool DartBoard::snapshotted() { return this->snapshot_taken_; }
 
 void DartBoard::calibrate_board(cv::Mat& input_frame, int dist, int p1, int p2, int min_R, int max_R)
 {
@@ -46,7 +44,7 @@ bool DartBoard::take_snapshot(cv::Mat& input_frame)
 		cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
 		circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
 		this->frame_ = roi & mask;
-		this->snapshot_taken_ = true;
+		this->set_state(1);
 	}
 	else
 	{
@@ -102,7 +100,7 @@ bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, 
 
 	if (smallest_dist < ERROR_OFF_CENTER)
 	{
-		
+		/*
 		if (inner)
 		{
 			this->inner_bullseye_calibrated_ = true;
@@ -111,6 +109,7 @@ bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, 
 		{
 			this->outer_bullseye_calibrated_ = true;
 		}
+		*/
 		std::cout << type << "-bullseye looks good " << smallest_dist << std::endl;
 		return true;
 	} else
@@ -121,34 +120,26 @@ bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, 
 	
 }
 
-void DartBoard::new_snapshot() { this->snapshot_taken_ = false; this->inner_bullseye_calibrated_ = false; this->outer_bullseye_calibrated_ = false; this->doubles_calibrated_ = false, segment_lines_calibrated_ = false; }
-
-bool DartBoard::bullseye_located(bool inner)
-{
-	if (inner)
-		return this->inner_bullseye_calibrated_;
-	return this->outer_bullseye_calibrated_;
-}
-
-bool DartBoard::calibrated()
-{
-	if (this->outer_bullseye_calibrated_ && this->inner_bullseye_calibrated_ && this->doubles_calibrated_ && this->triples_calibrated_ && this->segment_lines_calibrated_)
-		return true;
-}
-
 cv::Mat DartBoard::get_frame_segments()
 {
 	Mat frame_segments = this->frame_.clone();
-	cv::circle(frame_segments, Point(this->outer_bullseye_[0], this->outer_bullseye_[1]), this->outer_bullseye_[2], cv::Scalar(0, 0, 255), 2, 8, 0);
-	cv::circle(frame_segments, Point(this->inner_bullseye_[0], this->inner_bullseye_[1]), this->inner_bullseye_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
-	cv::circle(frame_segments, Point(this->inner_triple_[0], this->inner_triple_[1]), this->inner_triple_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
-	cv::circle(frame_segments, Point(this->outer_triple_[0], this->outer_triple_[1]), this->outer_triple_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
-	cv::circle(frame_segments, Point(this->inner_double_[0], this->inner_double_[1]), this->inner_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
-	cv::circle(frame_segments, Point(this->outer_double_[0], this->outer_double_[1]), this->outer_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
+	if (this->c_state_ > 0)
+		cv::circle(frame_segments, Point(this->outer_bullseye_[0], this->outer_bullseye_[1]), this->outer_bullseye_[2], cv::Scalar(0, 0, 255), 2, 8, 0);
+	if (this->c_state_ > 1)
+		cv::circle(frame_segments, Point(this->inner_bullseye_[0], this->inner_bullseye_[1]), this->inner_bullseye_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
+	if (this->c_state_ > 2)
+		cv::circle(frame_segments, Point(this->outer_triple_[0], this->outer_triple_[1]), this->outer_triple_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
+	if (this->c_state_ > 3)
+		cv::circle(frame_segments, Point(this->inner_triple_[0], this->inner_triple_[1]), this->inner_triple_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
+	if (this->c_state_ > 4)
+		cv::circle(frame_segments, Point(this->outer_double_[0], this->outer_double_[1]), this->outer_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
+	if (this->c_state_ > 5)
+		cv::circle(frame_segments, Point(this->inner_double_[0], this->inner_double_[1]), this->inner_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
+
 
 
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
-	if (this->calibrated())
+	if (this->c_state_ == 8) // max c_state_ future note
 	{
 		
 		// segments
@@ -183,17 +174,12 @@ cv::Mat DartBoard::get_frame_segments()
 	return frame_segments;
 }
 
-bool DartBoard::doubles_located()
-{
-	return this->doubles_calibrated_;
-}
-
-bool DartBoard::locate_doubles(int p1, int p2)
+bool DartBoard::locate_doubles(int e_p1, int e_p2, int dist, int p1, int p2, int min_R, int max_R, bool inner)
 {
 	const int ERROR_OFF_CENTER = 10;
 	cv::Mat gray, edge, frame_contours = Mat::zeros(Size(this->frame_.cols, this->frame_.rows), CV_8UC1);
 	cvtColor(this->frame_, gray, COLOR_RGB2GRAY);
-	Canny(gray, edge, p1, p2);
+	Canny(gray, edge, e_p1, e_p2);
 	vector<vector<Point> > contours;
     vector<Vec4i> hierarchy;
 
@@ -203,77 +189,64 @@ bool DartBoard::locate_doubles(int p1, int p2)
 	colors[2] = cv::Scalar(0, 0, 255);
 	cvtColor(frame_contours, frame_contours, COLOR_GRAY2BGR);
 	findContours(edge, contours, hierarchy, RETR_LIST, CHAIN_APPROX_NONE);
-	// delete small/errorous 
+	// delete small errors
 	for (size_t i = 0; i < contours.size(); i++) {
 		if (contours[i].size() < 50)
 		{
 			contours.erase(contours.begin() + i);
 		}
-		//cout << i << ": " << contours[i].size() << endl;
 	}
 
 	for (size_t i = 0; i < contours.size(); i++) {
 		cv::drawContours(frame_contours, contours, i, colors[1]);
 	}
 
-	int numb_circles = 0, runs = 0;
-	const int MAX_RUNS = 10;
 
-	while (numb_circles != 2 && runs < MAX_RUNS)
+	std::vector<cv::Vec3f> circles;
+	Mat frame_gray;
+	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
+	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(9, 9), 2, 2);// int track_dist5 = 200, p15 = 101, p25 = 80, minR5 = 153, maxR5 = 163;
+	cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.7, dist, p1, p2, min_R, max_R);
+
+	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
+	double smallest_dist = 99999;
+	cv::Vec3f outer_circ;
+	for (size_t i = 0; i < this->potential_circles_.size(); i++)
 	{
-		runs++;
-		std::vector<cv::Vec3f> circles;
-		Mat frame_gray;
-		cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
-		cv::GaussianBlur(frame_gray, frame_gray, cv::Size(9, 9), 2, 2);// int track_dist5 = 200, p15 = 101, p25 = 80, minR5 = 153, maxR5 = 163;
-		if (numb_circles == 0)
-			cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.7, 200, 101, 80, 153, 163);
-		else 
-			cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.7, 200, 103, 89, 160, 192);
-
-		cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
-		double smallest_dist = 99999;
-		cv::Vec3f outer_circ;
-		for (size_t i = 0; i < this->potential_circles_.size(); i++)
+		cv::Point center(cvRound(this->potential_circles_[i][0]), cvRound(this->potential_circles_[i][1]));
+		int radius = cvRound(this->potential_circles_[i][2]);
+		double distance_to_center = distance_between(dartboard_center, center);
+		if (distance_to_center < smallest_dist)
 		{
-			cv::Point center(cvRound(this->potential_circles_[i][0]), cvRound(this->potential_circles_[i][1]));
-			int radius = cvRound(this->potential_circles_[i][2]);
-			double distance_to_center = distance_between(dartboard_center, center);
-			if (distance_to_center < smallest_dist)
-			{
-				smallest_dist = distance_to_center;
-				outer_circ = this->potential_circles_[i];
-			}
-			//circle(frame_contours, cv::Point(this->potential_circles_[i][0], this->potential_circles_[i][1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-			//circle(frame_contours, cv::Point(this->potential_circles_[i][0], this->potential_circles_[i][1]), this->potential_circles_[i][2], cv::Scalar(0, 0, 255), 1, 8, 0);
-		}
-
-		circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-		circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), outer_circ[2], cv::Scalar(0, 0, 255), 1, 8, 0);
-
-		 
-		if (smallest_dist < ERROR_OFF_CENTER)
-		{
-			if (numb_circles == 0)
-				this->inner_double_ = outer_circ;
-			else
-				this->outer_double_ = outer_circ;
-
-			numb_circles++;
-			std::cout << "double looks good " << smallest_dist << std::endl;
+			smallest_dist = distance_to_center;
+			outer_circ = this->potential_circles_[i];
 		}
 	}
-	this->doubles_calibrated_ = true;
+
+	circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+	circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), outer_circ[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+
+
+	if (smallest_dist < ERROR_OFF_CENTER)
+	{
+		if (inner)
+			this->inner_double_ = outer_circ;
+		else
+			this->outer_double_ = outer_circ;
+
+		std::cout << "double looks good " << smallest_dist << std::endl;
+	}
+
 	return true;
 }
 
 
-bool DartBoard::locate_triples(int p1, int p2)
+bool DartBoard::locate_triples(int e_p1, int e_p2, int dist, int p1, int p2, int min_R, int max_R, bool inner)
 {
 	const int ERROR_OFF_CENTER = 10;
 	cv::Mat gray, edge, frame_contours = Mat::zeros(Size(this->frame_.cols, this->frame_.rows), CV_8UC1);
 	cvtColor(this->frame_, gray, COLOR_RGB2GRAY);
-	Canny(gray, edge, p1, p2);
+	Canny(gray, edge, e_p1, e_p2);
 	vector<vector<Point> > contours;
 	vector<Vec4i> hierarchy;
 
@@ -286,67 +259,48 @@ bool DartBoard::locate_triples(int p1, int p2)
 	// delete small/errorous 
 	for (size_t i = 0; i < contours.size(); i++) {
 		if (contours[i].size() < 50)
-		{
 			contours.erase(contours.begin() + i);
-		}
-
 	}
 
-	for (size_t i = 0; i < contours.size(); i++) {
+	for (size_t i = 0; i < contours.size(); i++) 
 		cv::drawContours(frame_contours, contours, i, colors[1]);
-	}
 
-	int numb_circles = 0;
+	std::vector<cv::Vec3f> circles;
+	Mat frame_gray;
+	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
+	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(9, 9), 2, 2);
+	cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.5, dist, p1, p2, min_R, max_R);
 
-	while (numb_circles != 2)
+	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
+	double smallest_dist = 99999;
+	cv::Vec3f outer_circ;
+	for (size_t i = 0; i < this->potential_circles_.size(); i++)
 	{
-		std::vector<cv::Vec3f> circles;
-		Mat frame_gray;
-		cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
-		cv::GaussianBlur(frame_gray, frame_gray, cv::Size(9, 9), 2, 2);// int track_dist5 = 200, p15 = 101, p25 = 80, minR5 = 153, maxR5 = 163;
-		if (numb_circles == 0)
-			cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.5, 170, 52, 70, 99, 139);
-		else
-			cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.5, 118, 43, 77, 71, 106);
-
-		cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
-		double smallest_dist = 99999;
-		cv::Vec3f outer_circ;
-		for (size_t i = 0; i < this->potential_circles_.size(); i++)
+		cv::Point center(cvRound(this->potential_circles_[i][0]), cvRound(this->potential_circles_[i][1]));
+		int radius = cvRound(this->potential_circles_[i][2]);
+		double distance_to_center = distance_between(dartboard_center, center);
+		if (distance_to_center < smallest_dist)
 		{
-			cv::Point center(cvRound(this->potential_circles_[i][0]), cvRound(this->potential_circles_[i][1]));
-			int radius = cvRound(this->potential_circles_[i][2]);
-			double distance_to_center = distance_between(dartboard_center, center);
-			if (distance_to_center < smallest_dist)
-			{
-				smallest_dist = distance_to_center;
-				outer_circ = this->potential_circles_[i];
-			}
-			//circle(frame_contours, cv::Point(this->potential_circles_[i][0], this->potential_circles_[i][1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-			//circle(frame_contours, cv::Point(this->potential_circles_[i][0], this->potential_circles_[i][1]), this->potential_circles_[i][2], cv::Scalar(0, 0, 255), 1, 8, 0);
-		}
-
-		circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-		circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), outer_circ[2], cv::Scalar(0, 0, 255), 1, 8, 0);
-
-
-		if (smallest_dist < ERROR_OFF_CENTER)
-		{
-			if (numb_circles == 0)  
-				this->outer_triple_ = outer_circ;
-			else
-				this->inner_triple_ = outer_circ;
-
-			numb_circles++;
-			std::cout << "triple looks good " << smallest_dist << std::endl;
+			smallest_dist = distance_to_center;
+			outer_circ = this->potential_circles_[i];
 		}
 	}
-	this->triples_calibrated_ = true;
-	//return frame_contours;
+
+	circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+	circle(frame_contours, cv::Point(outer_circ[0], outer_circ[1]), outer_circ[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+
+
+	if (smallest_dist < ERROR_OFF_CENTER)
+	{
+		if (inner)
+			this->inner_triple_ = outer_circ;
+		else
+			this->outer_triple_ = outer_circ;
+
+		std::cout << "triple looks good " << smallest_dist << std::endl;
+	}
 	return true;
 }
-
-bool DartBoard::triples_located() { return this->triples_calibrated_; }
 
 cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 {
@@ -537,11 +491,6 @@ bool DartBoard::segment_hit(cv::Point& hit, cv::Vec3f outer)
 	return false;
 }
 
-bool DartBoard::segment_lines_calibrated()
-{
-	return this->segment_lines_calibrated_;
-}
-
 void DartBoard::create_segment(int x, int g)
 {
 	int ccw_ids[20] = { 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6, 13, 4, 18, 1 };
@@ -560,14 +509,15 @@ void DartBoard::lock_in_segment_lines()
 {
 	if (this->lines_.size() == 20)
 	{
-		this->segment_lines_calibrated_ = true;
-
 		for (int i = 0; i < this->lines_.size(); i++)
 		{
 			this->create_segment(i, i + 1);
 		}
 	}
+	this->set_state(8);
 }
+
+
 
 cv::Mat DartBoard::check_darts(cv::Mat input_frame)
 {
@@ -578,6 +528,13 @@ cv::Mat DartBoard::check_darts(cv::Mat input_frame)
 	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
 	return roi & mask;
 
+}
+
+int DartBoard::get_state() { return this->c_state_; }
+
+void DartBoard::set_state(int s)
+{
+	this->c_state_ = s;
 }
 
 
