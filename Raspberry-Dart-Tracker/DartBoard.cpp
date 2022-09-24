@@ -2,8 +2,12 @@
 #include "Library.h"
 #include <iostream>
 
-DartBoard::DartBoard() : c_state_(0)
+DartBoard::DartBoard() : c_state_(0), new_state_(true)
 {
+	for (int i = 0; i < 6; i++)
+	{
+		this->boundaries_[i] = new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) };
+	}
 }
 
 void DartBoard::calibrate_board(cv::Mat& input_frame, int dist, int p1, int p2, int min_R, int max_R)
@@ -44,7 +48,6 @@ bool DartBoard::take_snapshot(cv::Mat& input_frame)
 		cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
 		circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
 		this->frame_ = roi & mask;
-		this->set_state(1);
 	}
 	else
 	{
@@ -60,6 +63,7 @@ cv::Mat& DartBoard::get_frame_circles() { return this->frame_circles_; }
 
 cv::Mat& DartBoard::get_frame_bullseye_circles() { return this->frame_bullseye_circles_; }
 
+/*
 bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, bool inner)
 {
 	const int ERROR_OFF_CENTER = 10;
@@ -109,7 +113,7 @@ bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, 
 		{
 			this->outer_bullseye_calibrated_ = true;
 		}
-		*/
+		
 		std::cout << type << "-bullseye looks good " << smallest_dist << std::endl;
 		return true;
 	} else
@@ -119,26 +123,68 @@ bool DartBoard::locate_bullseye(int dist, int p1, int p2, int min_R, int max_R, 
 	}
 	
 }
+*/// old
+bool DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold)
+{
+	std::string bound_names[6] = { "BULLSEYE_INNER", "BULLEYES_OUTER", "TRIPLE_INNER", "TRIPLE_OUTER", "DOUBLE_INNER", "DOUBLE_OUTER" };
+	this->frame_bullseye_circles_ = this->frame_.clone();
+	cv::Mat frame_dartboard_gray;
+	cv::Vec3f best_circle;
+	std::vector<cv::Vec3f> potential_bullseyes;
+	cv::cvtColor(this->frame_, frame_dartboard_gray, cv::COLOR_BGR2GRAY);
+	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
+	double smallest_dist = 99999;
+	cv::GaussianBlur(frame_dartboard_gray, frame_dartboard_gray, cv::Size(5, 5), 2, 2);
+	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, dist, p1, p2, min_R, max_R);
+	for (size_t i = 0; i < potential_bullseyes.size(); i++)
+	{
+		cv::Point center(cvRound(potential_bullseyes[i][0]), cvRound(potential_bullseyes[i][1]));
+		int radius = cvRound(potential_bullseyes[i][2]);
+		double distance_to_center = distance_between(dartboard_center, center);
+		if (distance_to_center < smallest_dist)
+		{
+			smallest_dist = distance_to_center;
+			best_circle = potential_bullseyes[i];
+		}
+	}
+	circle(this->frame_bullseye_circles_, cv::Point(best_circle[0], best_circle[1]), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+	circle(this->frame_bullseye_circles_, cv::Point(best_circle[0], best_circle[1]), best_circle[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+
+
+	this->boundaries_[boundary.type]->circ = best_circle;
+	
+
+	if (smallest_dist < offcenter_threshold) // Check if the detected circle is off center
+	{
+		std::cout << bound_names[boundary.type] << " is within the threshold, distance: " << smallest_dist << std::endl;
+		return true;
+	}
+	std::cout << bound_names[boundary.type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
+	return false;
+
+}
+
+void DartBoard::locate_boundaries(CircleParams* params)
+{
+	//for (int i = 1; i < 7; i++)
+	this->locate_boundary(params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR, *this->boundaries_[c_state_-1], 10);
+}
+
 
 cv::Mat DartBoard::get_frame_segments()
 {
 	Mat frame_segments = this->frame_.clone();
-	if (this->c_state_ > 0)
-		cv::circle(frame_segments, Point(this->outer_bullseye_[0], this->outer_bullseye_[1]), this->outer_bullseye_[2], cv::Scalar(0, 0, 255), 2, 8, 0);
-	if (this->c_state_ > 1)
-		cv::circle(frame_segments, Point(this->inner_bullseye_[0], this->inner_bullseye_[1]), this->inner_bullseye_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
-	if (this->c_state_ > 2)
-		cv::circle(frame_segments, Point(this->outer_triple_[0], this->outer_triple_[1]), this->outer_triple_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
-	if (this->c_state_ > 3)
-		cv::circle(frame_segments, Point(this->inner_triple_[0], this->inner_triple_[1]), this->inner_triple_[2], cv::Scalar(255, 0, 0), 2, 8, 0);
-	if (this->c_state_ > 4)
-		cv::circle(frame_segments, Point(this->outer_double_[0], this->outer_double_[1]), this->outer_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
-	if (this->c_state_ > 5)
-		cv::circle(frame_segments, Point(this->inner_double_[0], this->inner_double_[1]), this->inner_double_[2], cv::Scalar(0, 255, 0), 2, 8, 0);
-
-
-
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
+	for (int i = 0; i < 6; i ++)
+	{
+		if (this->c_state_ > i)
+		{
+			int val = ((i - 1) / 2) - ((pow((-1), i - 1) - 1) / -4);
+			cv::circle(frame_segments, Point(this->boundaries_[i]->circ[0], this->boundaries_[i]->circ[1]), this->boundaries_[i]->circ[2], colors[val], 2, 8, 0);
+		}
+			
+	}
+
 	if (this->c_state_ == 8) // max c_state_ future note
 	{
 		
@@ -173,7 +219,7 @@ cv::Mat DartBoard::get_frame_segments()
 
 	return frame_segments;
 }
-
+/*
 bool DartBoard::locate_doubles(int e_p1, int e_p2, int dist, int p1, int p2, int min_R, int max_R, bool inner)
 {
 	const int ERROR_OFF_CENTER = 10;
@@ -240,7 +286,6 @@ bool DartBoard::locate_doubles(int e_p1, int e_p2, int dist, int p1, int p2, int
 	return true;
 }
 
-
 bool DartBoard::locate_triples(int e_p1, int e_p2, int dist, int p1, int p2, int min_R, int max_R, bool inner)
 {
 	const int ERROR_OFF_CENTER = 10;
@@ -301,7 +346,7 @@ bool DartBoard::locate_triples(int e_p1, int e_p2, int dist, int p1, int p2, int
 	}
 	return true;
 }
-
+*/// old
 cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 {
 	// pipeline: hsv -> detect black & white
@@ -394,29 +439,29 @@ void DartBoard::check_hit(cv::Point& hit)
 	// Check for multiplier/special region
 	cout << boolalpha;
 	bool hit_inside = false;
-	if (segment_hit(hit, this->outer_double_, this->inner_double_))
+	if (segment_hit(hit, this->boundaries_[TYPE::DOUBLE_OUTER]->circ, this->boundaries_[TYPE::DOUBLE_INNER]->circ))
 	{
 		cout << "Hit double: " << hit << "!\n";
 		hit_inside = true;
 	}
-	else if (segment_hit(hit, this->outer_triple_, this->inner_triple_))
+	else if (segment_hit(hit, this->boundaries_[TYPE::TRIPLE_OUTER]->circ, this->boundaries_[TYPE::TRIPLE_INNER]->circ))
 	{
 		cout << "Hit triple: " << hit << "!\n";
 		hit_inside = true;
 	}
-	else if (segment_hit(hit, this->inner_double_, this->outer_triple_))
+	else if (segment_hit(hit, this->boundaries_[TYPE::DOUBLE_INNER]->circ, this->boundaries_[TYPE::TRIPLE_OUTER]->circ))
 	{
 		cout << "Hit outer-single:: " << hit << "!\n";
 		hit_inside = true;
 	}
-	else if (segment_hit(hit, this->inner_triple_, this->outer_bullseye_))
+	else if (segment_hit(hit, this->boundaries_[TYPE::TRIPLE_INNER]->circ, this->boundaries_[TYPE::BULLEYES_OUTER]->circ))
 	{
 		cout << "Hit inner-single: " << hit << "!\n";
 		hit_inside = true;
 	}
-	else if (segment_hit(hit, this->outer_bullseye_, this->inner_bullseye_))
+	else if (segment_hit(hit, this->boundaries_[TYPE::BULLEYES_OUTER]->circ, this->boundaries_[TYPE::BULLSEYE_INNER]->circ))
 		cout << "Hit Green Bullseye: " << hit << "!\n";
-	else if (segment_hit(hit, this->inner_bullseye_))
+	else if (segment_hit(hit, this->boundaries_[TYPE::BULLSEYE_INNER]->circ))
 		cout << "Hit Red Bullseye: " << hit << "!\n";
 		
 
@@ -535,6 +580,17 @@ int DartBoard::get_state() { return this->c_state_; }
 void DartBoard::set_state(int s)
 {
 	this->c_state_ = s;
+	this->new_state_ = true;
+}
+
+bool DartBoard::state_change()
+{
+	if (this->new_state_)
+	{
+		this->new_state_ = false;
+		return true;
+	}
+	return false;
 }
 
 
