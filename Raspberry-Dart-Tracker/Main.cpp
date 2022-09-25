@@ -84,8 +84,8 @@ int main()
 			profiles >> profile_line_params[n].e_p2;
 			numberParams++;
 			n++;
-			profiles.close();
 		}
+		profiles.close();
 
 
 		do
@@ -178,15 +178,18 @@ int main()
 		{
 			if (Board.get_state() == 0) {
 				Board.take_snapshot(frame);
+				Board.set_state(1);
 			}
-			if (Board.get_state() < 7) {
+			else if (Board.get_state() < 7) {
 				profile << profile_params[prof][Board.get_state()].dist << ',' << profile_params[prof][Board.get_state()].p1 << ',' << profile_params[prof][Board.get_state()].p2 << ','
 					<< profile_params[prof][Board.get_state()].minR << ',' << profile_params[prof][Board.get_state()].maxR << '\n';
+				Board.set_state(Board.get_state() + 1);
 			}
 			else if (Board.get_state() == 7) {
 				profile << profile_line_params[prof].p1 << ',' << profile_line_params[prof].p2 << ',' << profile_line_params[prof].p3 << ','
 					<< profile_line_params[prof].e_p1 << ',' << profile_line_params[prof].e_p2 << '\n';
 				Board.lock_in_segment_lines();
+				Board.set_state(8);
 			}
 			else if (Board.get_state() == 8)
 			{
@@ -194,7 +197,7 @@ int main()
 				Mat dart_frame = Board.check_darts(frame);
 				imshow("Darts", dart_frame);
 			}
-			Board.set_state(Board.get_state() + 1);
+			
 
 		}
 		else if (key_code == 102 || key_code == 707) { // 'f' to reset the DartBoard Calibration

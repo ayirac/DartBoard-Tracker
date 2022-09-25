@@ -83,7 +83,7 @@ bool DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, 
 			best_circle = potential_bullseyes[i];
 		}
 	}
-
+	 
 	this->boundaries_[boundary.type]->circ = best_circle;
 
 	if (smallest_dist < offcenter_threshold) // Check if the detected circle is off center
