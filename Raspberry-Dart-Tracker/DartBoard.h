@@ -33,7 +33,7 @@ class DartBoard
 {
 private:
 	cv::Vec3f dartboard_circle_;
-	cv::Mat frame_, frame_circles_, frame_bullseye_circles_;
+	cv::Mat frame_, frame_circles_;
 	std::vector<Segment> segments_;
 	BoundaryCircle* boundaries_[6];
 	int c_state_; // Calibration State: Snapshot, Bullseye_O, Bullseye_I, Triples_O, Triples_I, Doubles_O, Doubles_I, Segment LInes (0 - 7)
@@ -58,7 +58,7 @@ public:
 	void create_segment(int x, int g);
 	void lock_in_segment_lines();
 	cv::Mat check_darts(cv::Mat input_frame);
-	int get_state();
+	int& get_state();
 	void set_state(int s);
 	bool state_change();
 };

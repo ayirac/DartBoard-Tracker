@@ -43,40 +43,48 @@ int main()
 	resizeWindow("Trackbar Controls", 5, 5);
 	moveWindow("Trackbar Controls", 5, 5);
 	moveWindow("Frame", 700, 20);
-	
-
-	// old values
-	//int lines_p1 = 147, lines_p2 = 92, lines_p3 = 25;
-	//int edges_p1 = 242, edges_p2 = 201;
 	bool first_calibration = false;
 
 	// Load profiles for calibration values
 	char eater;
-	int prof = 0;
-	ifstream profiles("profiles.dat");
+	int prof = 0, dist;
+	bool corrupt_profile = false;
+	ifstream profiles("profile.dat");
 	CircleParams profile_params[50][7];
 	LinesParams profile_line_params[5];
 	if (profiles.good())
 	{
-		int n = 0;
-		
+		int n = 0; // current profile
+		int numberParams = 0;
 
-		while (!profiles.eof())
+		while (!profiles.eof() && !corrupt_profile) // Loads all profiles into an array
 		{
 			for (int i = 0; i < 7; i++)
 			{
-				profiles >> profile_params[n][i].dist >> eater;
+				profiles >> dist >> eater; // Check for invalid profile #999
+				if (dist == 999) {
+					cout << "Profile not complete, configure manually.\n";
+					for (int i = 0; i < 8 - numberParams; i++)
+						profile_params[0][i].dist = 80, profile_params[0][i].p1 = 100, profile_params[0][i].p2 = 120, profile_params[0][i].minR = 100, profile_params[0][i].maxR = 200;
+					profile_line_params[n - 1].p1 = 100, profile_line_params[n - 1].p2 = 100, profile_line_params[n - 1].p3 = 100, profile_line_params[n - 1].e_p1 = 80, profile_line_params[n - 1].e_p2 = 80;
+					corrupt_profile = true;
+					break;
+				}
+				profile_params[n][i].dist = dist;
 				profiles >> profile_params[n][i].p1 >> eater;
 				profiles >> profile_params[n][i].p2 >> eater;
 				profiles >> profile_params[n][i].minR >> eater;
 				profiles >> profile_params[n][i].maxR;
+				numberParams++;
 			}
 			profiles >> profile_line_params[n].p1 >> eater;
 			profiles >> profile_line_params[n].p2 >> eater;
 			profiles >> profile_line_params[n].p3 >> eater;
 			profiles >> profile_line_params[n].e_p1 >> eater;
 			profiles >> profile_line_params[n].e_p2;
+			numberParams++;
 			n++;
+			profiles.close();
 		}
 
 
@@ -91,7 +99,8 @@ int main()
 	}
 	else
 	{
-		profile_params[0][0].dist = 15, profile_params[0][0].p1 = 15, profile_params[0][0].p2 = 15, profile_params[0][0].minR = 15, profile_params[0][0].maxR = 60;
+		for (int i = 0; i < 8; i++)
+			profile_params[0][i].dist = 80, profile_params[0][i].p1 = 100, profile_params[0][i].p2 = 120, profile_params[0][i].minR = 100, profile_params[0][i].maxR = 200;
 	}
 
 	int* p_dist = &profile_params[prof][0].dist, *p_p1 = &profile_params[prof][0].p1, *p_p2 = &profile_params[prof][0].p2, *p_minR = &profile_params[prof][0].minR, *p_maxR = &profile_params[prof][0].maxR;
@@ -109,20 +118,19 @@ int main()
 		cap >> frame;
 
 		// Calibration pipeline //
-		int state = Board.get_state();
-		if (state == 0)
+		if (Board.get_state() == 0)
 			Board.calibrate_board(frame, profile_params[prof][0].dist, profile_params[prof][0].p1, profile_params[prof][0].p2, profile_params[prof][0].minR, profile_params[prof][0].maxR);
-		else if (state < 7)
+		else if (Board.get_state() < 7)
 			Board.locate_boundaries(profile_params[prof]);
-		else if (state == 7) // locate segments
+		else if (Board.get_state() == 7) // locate segments
 			gray = Board.locate_singles(profile_line_params[prof].p1, profile_line_params[prof].p2, profile_line_params[prof].p3, profile_line_params[prof].e_p1, profile_line_params[prof].e_p2);
 
 		// Update trackbar pointers according current step
-		p_dist = &profile_params[prof][state].dist;
-		p_p1 = &profile_params[prof][state].p1;
-		p_p2 = &profile_params[prof][state].p2;
-		p_minR = &profile_params[prof][state].minR;
-		p_maxR = &profile_params[prof][state].maxR;
+		p_dist = &profile_params[prof][Board.get_state()].dist;
+		p_p1 = &profile_params[prof][Board.get_state()].p1;
+		p_p2 = &profile_params[prof][Board.get_state()].p2;
+		p_minR = &profile_params[prof][Board.get_state()].minR;
+		p_maxR = &profile_params[prof][Board.get_state()].maxR;
 									
 		// Display & Update windows, taskbars //
 		if (Board.state_change())
@@ -144,12 +152,12 @@ int main()
 			
 		}
 				
-		if (state == 0)
+		if (Board.get_state() == 0)
 			imshow("Frame", Board.get_frame_circles());
 		else
 		{
 			imshow("Frame Snapshot", Board.get_frame_segments());
-			if (state == 7)
+			if (Board.get_state() == 7)
 				imshow("Frame Doubles", gray);
 
 
@@ -157,7 +165,7 @@ int main()
 			{
 				first_calibration = true;
 				moveWindow("Frame Snapshot", 20, 330);
-				if (state == 6)
+				if (Board.get_state() == 6)
 					moveWindow("Frame Doubles", 365, 330);
 				setMouseCallback("Frame Snapshot", mouse_callback, &Board);
 			}
@@ -168,26 +176,25 @@ int main()
 		int key_code = waitKey(20);
 		if (key_code == 32) 							// 'Space' to snapshot the DartBoard during Calibration
 		{
-			Board.set_state(state + 1);
-
-			if (state == 0) {
+			if (Board.get_state() == 0) {
 				Board.take_snapshot(frame);
 			}
-			if (state < 7) {
-				profile << profile_params[prof][state].dist << ',' << profile_params[prof][state].p1 << ',' << profile_params[prof][state].p2 << ','
-					<< profile_params[prof][state].minR << ',' << profile_params[prof][state].maxR << '\n';
+			if (Board.get_state() < 7) {
+				profile << profile_params[prof][Board.get_state()].dist << ',' << profile_params[prof][Board.get_state()].p1 << ',' << profile_params[prof][Board.get_state()].p2 << ','
+					<< profile_params[prof][Board.get_state()].minR << ',' << profile_params[prof][Board.get_state()].maxR << '\n';
 			}
-			else if (state == 7) {
+			else if (Board.get_state() == 7) {
 				profile << profile_line_params[prof].p1 << ',' << profile_line_params[prof].p2 << ',' << profile_line_params[prof].p3 << ','
 					<< profile_line_params[prof].e_p1 << ',' << profile_line_params[prof].e_p2 << '\n';
 				Board.lock_in_segment_lines();
 			}
-			else if (state == 8)
+			else if (Board.get_state() == 8)
 			{
 				// take a picture of a dart & show it
 				Mat dart_frame = Board.check_darts(frame);
 				imshow("Darts", dart_frame);
 			}
+			Board.set_state(Board.get_state() + 1);
 
 		}
 		else if (key_code == 102 || key_code == 707) { // 'f' to reset the DartBoard Calibration
@@ -196,21 +203,25 @@ int main()
 		else if (key_code == 27) // 'esc' to exit the program
 			break;
 		else if (key_code == 115) { // 's' to save the current calib values to the first available profile
-			if (state == 8)
+			ifstream iprofile("profile.dat");
+			if (iprofile.good())
 			{
-				ifstream iprofile("profile.dat");
-				if (iprofile.good())
-				{
-					// Add an extra profile, TODO
-				}
-				else {
-
-					iprofile.close();
-					ofstream oprofile("profile.dat");
-					oprofile << profile.str();
-
-				}
+				// Add an extra profile, TODO
+				ofstream oprofile("profile.dat", ios_base::app);
+				oprofile << "\n" << profile.str();
+				for (int i = 0; i < 8 - Board.get_state(); i++) // Add -, to indicate a missing field
+					if (i != 7 - Board.get_state())
+						oprofile << "-\n";
 			}
+			else {
+				ofstream oprofile("profile.dat");
+				oprofile << profile.str();
+				for (int i = 0; i < 8 - Board.get_state(); i++) // Add -, to indicate a missing field
+					oprofile << "-\n";
+
+			}
+			iprofile.close();
+			
 		}
 	}
 }
