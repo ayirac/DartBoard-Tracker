@@ -2,7 +2,7 @@
 
 double distance_between(Point p1, Point p2)
 {
-	return sqrt(pow(p2.x - p1.x, 2) + pow(p2.x - p1.x, 2));
+	return sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2));
 }
 
 Point find_most_centered_point(Point p1, Point p2, Point center)

@@ -29,27 +29,34 @@ struct LinesParams
 	int p1, p2, p3, e_p1, e_p2;
 };
 
+struct ThreshParams
+{
+	int lowH, lowS, lowV, highH, highS, highV, thresh;
+};
+
 class DartBoard
 {
 private:
 	cv::Vec3f dartboard_circle_;
-	cv::Mat frame_, frame_circles_;
+	cv::Mat frame_, cam_frame_, temp_frame_;
 	std::vector<Segment> segments_;
 	BoundaryCircle* boundaries_[6];
 	int c_state_; // Calibration State: Snapshot, Bullseye_O, Bullseye_I, Triples_O, Triples_I, Doubles_O, Doubles_I, Segment LInes (0 - 7)
 	std::vector<cv::Vec3f> potential_circles_;
 	std::vector<cv::Vec4i> lines_;
 	bool new_state_;
-
+	cv::Point2f src_pnts[4], dst_pnts[4];
 public:
 	DartBoard();
-	void calibrate_board(cv::Mat& input_frame, int dist, int p1, int p2, int min_R, int max_R);
-	bool take_snapshot(cv::Mat& input_frame);
+	cv::Mat calibrate_board(int dist, int p1, int p2, int min_R, int max_R);
+	cv::Mat locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh, int warpX, int warpY);
+	void perspective_transform(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh);
+	bool take_snapshot();
+	void take_perspective_transform(cv::Mat& input_frame, int warpX, int warpY);
 	cv::Mat& get_frame();
-	cv::Mat& get_frame_circles();
 	cv::Mat& get_frame_bullseye_circles();
-	bool locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold);
-	void locate_boundaries(CircleParams* arr);
+	cv::Mat locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold);
+	cv::Mat locate_boundaries(CircleParams* arr);
 	cv::Mat get_frame_segments();
 	cv::Mat locate_singles(int p1, int p2, int p3, int e_p1, int e_p2);
 	void check_hit(cv::Point& hit);
@@ -61,4 +68,5 @@ public:
 	int& get_state();
 	void set_state(int s);
 	bool state_change();
+	cv::Mat& get_cam_frame() { return cam_frame_; }
 };

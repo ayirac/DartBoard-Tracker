@@ -2,7 +2,7 @@
 #include "Library.h"
 #include <iostream>
 
-DartBoard::DartBoard() : c_state_(0), new_state_(true)
+DartBoard::DartBoard() : c_state_(-1), new_state_(true)
 {
 	for (int i = 0; i < 6; i++)
 	{
@@ -10,13 +10,13 @@ DartBoard::DartBoard() : c_state_(0), new_state_(true)
 	}
 }
 
-void DartBoard::calibrate_board(cv::Mat& input_frame, int dist, int p1, int p2, int min_R, int max_R)
+cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_R)
 {
 	cv::Mat frame_gray;
-	this->frame_circles_ = input_frame.clone();
-	cv::cvtColor(input_frame, frame_gray, cv::COLOR_BGR2GRAY);
-	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(9, 9), 2, 2);
-	cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 2, dist, p1, p2, min_R, max_R);
+	this->frame_ = this->temp_frame_.clone();
+	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
+	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(5, 5), 2, 2);
+	cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.3, dist, p1, p2, min_R, max_R);
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
 	cv::Vec3f inner_board;
@@ -33,20 +33,74 @@ void DartBoard::calibrate_board(cv::Mat& input_frame, int dist, int p1, int p2, 
 		
 	}
 
-	circle(this->frame_circles_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-	circle(this->frame_circles_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), inner_board[2], cv::Scalar(0, 0, 255), 3, 8, 0);
+	circle(this->frame_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+	circle(this->frame_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), inner_board[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+	//input_frame = clone;
+
+	return frame_gray;
 }
 
-bool DartBoard::take_snapshot(cv::Mat& input_frame)
+cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh, int warpX, int warpY)
+{
+	// HSV Range segment
+	cv::Mat hsv, thresheld, clone;
+	cv::cvtColor(input_frame, hsv, cv::COLOR_BGR2HSV);
+	cv::inRange(hsv, cv::Scalar(lows[0], lows[1], lows[2]), cv::Scalar(highs[0], highs[1], highs[2]), thresheld);
+	cv::dilate(thresheld, thresheld, cv::Mat(), cv::Point(-1, 1), 2);
+	clone = input_frame.clone();
+
+	// Find largest contour
+	std::vector<std::vector<cv::Point>> contours;
+	std::vector<cv::Vec4i> hierarchy;
+	findContours(thresheld, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+	cv::Mat drawing = cv::Mat::zeros(thresheld.size(), CV_8UC3);
+	int largest = -5000;
+	int largest_idx = 0;
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		drawContours(clone, contours, (int)i, cv::Scalar(255, 0, 0), 2, cv::LINE_8, hierarchy, 0);
+
+		if (static_cast<int>(contours[i].size()) > largest) {
+			largest = contours[i].size();
+			largest_idx = i;
+		}
+	}
+
+	// Get contour corners (src points) & sort in order BL, TL, TR, BR & setup dst points
+	
+	if (!contours.empty())
+	{
+		std::vector<cv::Point> pnts;
+		cv::approxPolyDP(contours[largest_idx], pnts, 0.05 * cv::arcLength(contours[largest_idx], true), true);
+		if (pnts.size() == 4)
+		{
+			this->src_pnts[0] = pnts[1];
+			this->src_pnts[1] = pnts[0];
+			this->src_pnts[2] = pnts[3];
+			this->src_pnts[3] = pnts[2];
+			this->dst_pnts[0] = cv::Point2f(0, distance_between(pnts[1], pnts[0])* (static_cast<float>(warpY) / 100));
+			this->dst_pnts[1] = cv::Point2f(0, 0);
+			this->dst_pnts[2] = cv::Point2f(distance_between(pnts[3], pnts[0])* (static_cast<float>(warpX) / 100), 0);
+			this->dst_pnts[3] = cv::Point2f(distance_between(pnts[3], pnts[0])* (static_cast<float>(warpX) / 100),  distance_between(pnts[1], pnts[0])* (static_cast<float>(warpY) / 100));
+		}
+		cv::Scalar cols[4] = { cv::Scalar(255,0,0), cv::Scalar(0,255,0), cv::Scalar(0,0,255),cv::Scalar(90,255,255) };
+		for (int i = 0; i < pnts.size(); i++) // Visual representation of corners
+			cv::circle(clone, pnts[i], 3, cols[i % 4], 3);
+	}
+	this->frame_ = clone;
+	return thresheld;
+}
+
+bool DartBoard::take_snapshot()
 {
 	if (this->potential_circles_.size() == 1)
 	{
 		this->dartboard_circle_ = this->potential_circles_[0];
 		cv::Point center(cvRound(dartboard_circle_[0]), cvRound(dartboard_circle_[1]));
 		int radius = cvRound(dartboard_circle_[2]);
-		cv::Mat roi(input_frame, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+		cv::Mat roi(this->temp_frame_, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
 		cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
-		circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
+		circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), 1);
 		this->frame_ = roi & mask;
 	}
 	else
@@ -57,11 +111,18 @@ bool DartBoard::take_snapshot(cv::Mat& input_frame)
 	
 }
 
+void DartBoard::take_perspective_transform(cv::Mat& input_frame, int warpX, int warpY)
+{
+	cv::Mat matrix = cv::getPerspectiveTransform(this->src_pnts, this->dst_pnts), warped;
+	cv::Size size(distance_between(this->src_pnts[2], this->src_pnts[1]) * (static_cast<float>(warpX) / 100), distance_between(this->src_pnts[3], this->src_pnts[2]) * (static_cast<float>(warpY)/100));
+	cv::warpPerspective(this->cam_frame_, warped, matrix, size, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+	this->frame_ = warped;
+	this->temp_frame_ = warped;
+}
+
 cv::Mat& DartBoard::get_frame() { return this->frame_; }
 
-cv::Mat& DartBoard::get_frame_circles() { return this->frame_circles_; }
-
-bool DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold)
+cv::Mat DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold)
 {
 	std::string bound_names[6] = { "BULLSEYE_INNER", "BULLEYES_OUTER", "TRIPLE_INNER", "TRIPLE_OUTER", "DOUBLE_INNER", "DOUBLE_OUTER" };
 	cv::Mat frame_dartboard_gray;
@@ -87,18 +148,16 @@ bool DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, 
 	this->boundaries_[boundary.type]->circ = best_circle;
 
 	if (smallest_dist < offcenter_threshold) // Check if the detected circle is off center
-	{
 		std::cout << bound_names[boundary.type] << " is within the threshold, distance: " << smallest_dist << std::endl;
-		return true;
-	}
-	std::cout << bound_names[boundary.type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
-	return false;
+	else
+		std::cout << bound_names[boundary.type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
+	return frame_dartboard_gray;
 
 }
 
-void DartBoard::locate_boundaries(CircleParams* params)
+cv::Mat DartBoard::locate_boundaries(CircleParams* params)
 {
-	this->locate_boundary(params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR, *this->boundaries_[c_state_-1], 10);
+	return this->locate_boundary(params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR, *this->boundaries_[c_state_-1], 10);
 }
 
 
@@ -387,5 +446,3 @@ bool DartBoard::state_change()
 	}
 	return false;
 }
-
-
