@@ -31,18 +31,17 @@ struct LinesParams
 
 struct ThreshParams
 {
-	int lowH, lowS, lowV, highH, highS, highV, thresh;
+	int lowH, lowS, lowV, highH, highS, highV, thresh, warpX, warpY;
 };
 
 class DartBoard
 {
 private:
-	cv::Vec3f dartboard_circle_;
 	cv::Mat frame_, cam_frame_, temp_frame_;
 	std::vector<Segment> segments_;
-	BoundaryCircle* boundaries_[6];
-	int c_state_; // Calibration State: Snapshot, Bullseye_O, Bullseye_I, Triples_O, Triples_I, Doubles_O, Doubles_I, Segment LInes (0 - 7)
-	std::vector<cv::Vec3f> potential_circles_;
+	std::vector<BoundaryCircle*> boundaries_;
+	int c_state_; // Calibration State: Perspective, Snapshot, Bullseye_O, Bullseye_I, Triples_O, Triples_I, Doubles_O, Doubles_I, Segment LInes (-1 - 7)
+	cv::Vec3f outer_circle_;
 	std::vector<cv::Vec4i> lines_;
 	bool new_state_;
 	cv::Point2f src_pnts[4], dst_pnts[4];
@@ -50,9 +49,9 @@ public:
 	DartBoard();
 	cv::Mat calibrate_board(int dist, int p1, int p2, int min_R, int max_R);
 	cv::Mat locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh, int warpX, int warpY);
-	void perspective_transform(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh);
 	bool take_snapshot();
-	void take_perspective_transform(cv::Mat& input_frame, int warpX, int warpY);
+	void take_perspective_transform(int warpX, int warpY);
+	cv::Mat take_perspective_transform(int warpX, int warpY, bool);
 	cv::Mat& get_frame();
 	cv::Mat& get_frame_bullseye_circles();
 	cv::Mat locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold);
@@ -64,9 +63,11 @@ public:
 	bool segment_hit(cv::Point& hit, cv::Vec3f outer);
 	void create_segment(int x, int g);
 	void lock_in_segment_lines();
-	cv::Mat check_darts(cv::Mat input_frame);
+	cv::Mat check_darts(int p1, int p2);
 	int& get_state();
 	void set_state(int s);
 	bool state_change();
+	BoundaryCircle* get_boundary(TYPE t);
 	cv::Mat& get_cam_frame() { return cam_frame_; }
+	void reset_segments();
 };

@@ -18,9 +18,10 @@ void mouse_callback(int event, int x, int y, int flags, void* userdata)
 
 int main()
 {
+	bool live = true;
 	const int max_value_H = 360 / 2;
 	const int max_value = 255;
-    string fp = "input/dartboard.mp4"; //dartboard-edit
+	string fp = "input/new.mp4"; //dartboard-edit
 	vector<vector<Point>> contours_frame;
 	vector<Vec4i> hierachy_frame;
 	vector<Vec3f> bullseyes;
@@ -30,6 +31,7 @@ int main()
 	if (!cap.isOpened()) // Setup camera, if not plugged in use a pre-recorded video for dev
 	{
 		cout << "Camera not found." << endl;
+		live = false;
 		cap.open(fp);
 		if (!cap.isOpened())
 		{
@@ -37,40 +39,40 @@ int main()
 			return -1;
 		}
 	}
-	double frames = cap.get(CAP_PROP_FRAME_COUNT);
+	
 	// Create Windows
 	cap >> Board.get_cam_frame(); // Read one frame to get metadata
+	double frames = cap.get(CAP_PROP_FRAME_COUNT);
 	namedWindow("Frame", WINDOW_NORMAL);
 	namedWindow("Frame Calib", WINDOW_NORMAL);
-	resizeWindow("Frame", Board.get_cam_frame().cols/3, Board.get_cam_frame().rows/3);
-	resizeWindow("Frame Calib", Board.get_cam_frame().cols/3, Board.get_cam_frame().rows/3);
+	resizeWindow("Frame", Board.get_cam_frame().cols / 3, Board.get_cam_frame().rows / 3);
+	resizeWindow("Frame Calib", Board.get_cam_frame().cols / 3, Board.get_cam_frame().rows / 3);
 	moveWindow("Frame", 0, 0);
 	moveWindow("Frame Calib", Board.get_cam_frame().cols / 3, 0);
 	namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
 	resizeWindow("Trackbar Controls", 5, 5);
 	moveWindow("Trackbar Controls", 5, 5);
 	bool first_calibration = false;
-	int warp_x = 0, warp_y = 0;
 
 	// Load profiles for calibration values
 	char eater;
 	int prof = 0, dist;
 	bool corrupt_profile = false;
 	ifstream profiles("profile.dat");
-	ThreshParams profile_thresh_params[5];
+	ThreshParams profile_thresh_params[5]; // thresh, lhsv, hhsv, warps
 	CircleParams profile_params[50][7];
 	LinesParams profile_line_params[5];
 	if (profiles.good())
 	{
 		int n = 0; // current profile
-		
+
 
 		while (!profiles.eof() && !corrupt_profile) // Loads all profiles into an array
 		{
 			int numberParams = 0;
 			// Loads THRESH params
 			profiles >> profile_thresh_params[n].thresh >> eater >> profile_thresh_params[n].lowH >> eater >> profile_thresh_params[n].lowS >> eater >> profile_thresh_params[n].lowV >> eater
-					 >> profile_thresh_params[n].highH >> eater >> profile_thresh_params[n].highS >> eater >> profile_thresh_params[n].highV;
+				>> profile_thresh_params[n].highH >> eater >> profile_thresh_params[n].highS >> eater >> profile_thresh_params[n].highV >> eater >> profile_thresh_params[n].warpX >> eater >> profile_thresh_params[n].warpY;
 			// Loads CIRCLE params
 			for (int i = 0; i < 7; i++)
 			{
@@ -112,38 +114,42 @@ int main()
 		{
 			do
 			{
-				cout << "Choose between profile 0 and profile " << n << ".\n";
+				cout << "Choose between profile 0 and profile " << n-1 << ".\n";
 				cin >> prof;
 			} while (prof > n || prof < 0);
 		}
 		cout << "Loaded profile " << prof << endl;
 
-	} else  { // Set default values if no profile file exists
+	}
+	else { // Set default values if no profile file exists
 		profile_thresh_params[0].thresh = 20, profile_thresh_params[0].lowH = 100, profile_thresh_params[0].lowS = 100, profile_thresh_params[0].lowV = 100,
-			profile_thresh_params[0].highH = 100, profile_thresh_params[0].highS = 100, profile_thresh_params[0].highV = 100;
+			profile_thresh_params[0].highH = 100, profile_thresh_params[0].highS = 100, profile_thresh_params[0].highV = 100, profile_thresh_params[0].warpX = 100, profile_thresh_params[0].warpY = 100;
 		for (int i = 0; i < 8; i++)
 			profile_params[0][i].dist = 80, profile_params[0][i].p1 = 100, profile_params[0][i].p2 = 120, profile_params[0][i].minR = 100, profile_params[0][i].maxR = 200;
 		profile_line_params[0].e_p1 = 80, profile_line_params[0].e_p2 = 80, profile_line_params[0].p1 = 100, profile_line_params[0].p2 = 120, profile_line_params[0].p3 = 120;
 	}
 
-	int* p_dist = &profile_params[prof][0].dist, *p_p1 = &profile_params[prof][0].p1, *p_p2 = &profile_params[prof][0].p2, *p_minR = &profile_params[prof][0].minR, *p_maxR = &profile_params[prof][0].maxR;
-	
+	int* p_dist = &profile_params[prof][0].dist, * p_p1 = &profile_params[prof][0].p1, * p_p2 = &profile_params[prof][0].p2, * p_minR = &profile_params[prof][0].minR, * p_maxR = &profile_params[prof][0].maxR;
+
 	ostringstream profile;
-	
+
 	// Main loop for getting frames & performing operations
 	while (true)
 	{
-		Mat calib_frame;
-		// Restarts the video when it ends
-		double frame_pos = cap.get(CAP_PROP_POS_FRAMES);
-		if (frame_pos == frames)
-			cap.set(CAP_PROP_POS_AVI_RATIO, 0);
+		if (!live)// Restarts the video when it ends, not working..
+		{
+			double frame_pos = cap.get(CAP_PROP_POS_FRAMES);
+			if (frame_pos == frames)
+				cap.set(CAP_PROP_POS_FRAMES, 0);
+		}
+		
 		cap >> Board.get_cam_frame();
+		Mat calib_frame;
 
 		// Calibration pipeline //
 		if (Board.get_state() == -1)
 			calib_frame = Board.locate_four_corners(Board.get_cam_frame(), Scalar(profile_thresh_params[prof].lowH, profile_thresh_params[prof].lowS, profile_thresh_params[prof].lowV),
-				Scalar(Scalar(profile_thresh_params[prof].highH, profile_thresh_params[prof].highS, profile_thresh_params[prof].highV)), profile_thresh_params[prof].thresh, warp_x, warp_y);
+				Scalar(Scalar(profile_thresh_params[prof].highH, profile_thresh_params[prof].highS, profile_thresh_params[prof].highV)), profile_thresh_params[prof].thresh, profile_thresh_params[prof].warpX, profile_thresh_params[prof].warpY);
 		else if (Board.get_state() == 0)
 			calib_frame = Board.calibrate_board(profile_params[prof][0].dist, profile_params[prof][0].p1, profile_params[prof][0].p2, profile_params[prof][0].minR, profile_params[prof][0].maxR);
 		else if (Board.get_state() < 7)
@@ -157,7 +163,7 @@ int main()
 		p_p2 = &profile_params[prof][Board.get_state()].p2;
 		p_minR = &profile_params[prof][Board.get_state()].minR;
 		p_maxR = &profile_params[prof][Board.get_state()].maxR;
-									
+
 		// Display & Update windows, taskbars //
 		if (Board.state_change())
 		{
@@ -174,27 +180,29 @@ int main()
 				cv::createTrackbar("maxS", "Trackbar Controls", &profile_thresh_params[prof].highS, max_value);
 				cv::createTrackbar("maxV", "Trackbar Controls", &profile_thresh_params[prof].highV, max_value);
 				cv::createTrackbar("thresh", "Trackbar Controls", &profile_thresh_params[prof].thresh, 50);
-				createTrackbar("warpX", "Trackbar Controls", &warp_x, 200);
-				createTrackbar("warpY", "Trackbar Controls", &warp_y, 200);
+				createTrackbar("warpX", "Trackbar Controls", &profile_thresh_params[prof].warpX, 200);
+				createTrackbar("warpY", "Trackbar Controls", &profile_thresh_params[prof].warpY, 200);
 			}
-			else
+			else if (Board.get_state() < 7)
 			{
 				createTrackbar("track_distL", "Trackbar Controls", p_dist, 200);
 				createTrackbar("p1", "Trackbar Controls", p_p1, 200);
 				createTrackbar("p2", "Trackbar Controls", p_p2, 200);
 				createTrackbar("minR", "Trackbar Controls", p_minR, 500);
 				createTrackbar("maxR", "Trackbar Controls", p_maxR, 600);
+				
+			}
+			else if (Board.get_state() == 7)
+			{
 				createTrackbar("edge_p1", "Trackbar Controls", &profile_line_params[prof].e_p1, 400);
 				createTrackbar("edge_p2", "Trackbar Controls", &profile_line_params[prof].e_p2, 400);
 				createTrackbar("thresh", "Trackbar Controls", &profile_line_params[prof].p1, 300);
-				createTrackbar("min len", "Trackbar Controls", &profile_line_params[prof].p2, 300);
-				createTrackbar("max gap", "Trackbar Controls", &profile_line_params[prof].p3, 100);
+				createTrackbar("min len", "Trackbar Controls", &profile_line_params[prof].p2, 500);
+				createTrackbar("max gap", "Trackbar Controls", &profile_line_params[prof].p3, 300);
 			}
-			
-			
 		}
 
-	
+
 		if (Board.get_state() == -1)
 		{
 			imshow("Frame", Board.get_frame());
@@ -217,17 +225,33 @@ int main()
 				moveWindow("Frame Doubles", 365, 330);
 			setMouseCallback("Frame Snapshot", mouse_callback, &Board);
 		}
-		imshow("Frame Calib", calib_frame);
+		if (Board.get_state() != 8) imshow("Frame Calib", calib_frame);
 
-			
+
 
 		// Keybinds // 
 		int key_code = waitKey(20);
 		if (key_code == 32) 							// 'Space' to snapshot the DartBoard during Calibration
-		{ // add perspectivetransform alignment pipeline here..
+		{
+			// Save profiles as state progresses
 			if (Board.get_state() == -1) {
-				
-				Board.take_perspective_transform(Board.get_cam_frame(), warp_x, warp_y);
+				profile << profile_thresh_params[prof].thresh << ',' << profile_thresh_params[prof].lowH << ',' << profile_thresh_params[prof].lowS << ',' << profile_thresh_params[prof].lowV << ','
+					<< profile_thresh_params[prof].highH << ',' << profile_thresh_params[prof].highS << ',' << profile_thresh_params[prof].highV << ','
+					<< profile_thresh_params[prof].warpX << ',' << profile_thresh_params[prof].warpY << '\n';
+			}
+			else if (Board.get_state() < 7 && Board.get_state() >= 0) {
+				profile << profile_params[prof][Board.get_state()].dist << ',' << profile_params[prof][Board.get_state()].p1 << ',' << profile_params[prof][Board.get_state()].p2 << ','
+					<< profile_params[prof][Board.get_state()].minR << ',' << profile_params[prof][Board.get_state()].maxR << '\n';
+			}
+			else if (Board.get_state() == 7) {
+				profile << profile_line_params[prof].p1 << ',' << profile_line_params[prof].p2 << ',' << profile_line_params[prof].p3 << ','
+					<< profile_line_params[prof].e_p1 << ',' << profile_line_params[prof].e_p2 << '\n';
+			}
+
+			// Actions based on state & set states
+			if (Board.get_state() == -1) {
+
+				Board.take_perspective_transform(profile_thresh_params[prof].warpX, profile_thresh_params[prof].warpY);
 				Board.set_state(0);
 			}
 			else if (Board.get_state() == 0) {
@@ -235,31 +259,45 @@ int main()
 				Board.set_state(1);
 			}
 			else if (Board.get_state() < 7) {
-				profile << profile_params[prof][Board.get_state()].dist << ',' << profile_params[prof][Board.get_state()].p1 << ',' << profile_params[prof][Board.get_state()].p2 << ','
-					<< profile_params[prof][Board.get_state()].minR << ',' << profile_params[prof][Board.get_state()].maxR << '\n';
 				Board.set_state(Board.get_state() + 1);
 			}
 			else if (Board.get_state() == 7) {
-				profile << profile_line_params[prof].p1 << ',' << profile_line_params[prof].p2 << ',' << profile_line_params[prof].p3 << ','
-					<< profile_line_params[prof].e_p1 << ',' << profile_line_params[prof].e_p2 << '\n';
 				Board.lock_in_segment_lines();
 				Board.set_state(8);
 			}
 			else if (Board.get_state() == 8)
 			{
 				// take a picture of a dart & show it
-				Mat dart_frame = Board.check_darts(Board.get_cam_frame());
+				Mat dart_frame = Board.check_darts(profile_thresh_params[prof].warpX, profile_thresh_params[prof].warpY);
 				imshow("Darts", dart_frame);
 			}
 			
-
 		}
 		else if (key_code == 102 || key_code == 707) { // 'f' to reset the DartBoard Calibration
-			Board.set_state(Board.get_state()-1);
+			if (Board.get_state() == 8)
+				Board.reset_segments();
+			Board.set_state(Board.get_state() - 1);
+			
 		}
 		else if (key_code == 27) // 'esc' to exit the program
 			break;
 		else if (key_code == 115) { // 's' to save the current calib values to the first available profile
+
+			if (Board.get_state() == -1) {
+				profile << profile_thresh_params[prof].thresh << ',' << profile_thresh_params[prof].lowH << ',' << profile_thresh_params[prof].lowS << ',' << profile_thresh_params[prof].lowV << ','
+					<< profile_thresh_params[prof].highH << ',' << profile_thresh_params[prof].highS << ',' << profile_thresh_params[prof].highV << ','
+					<< profile_thresh_params[prof].warpX << ',' << profile_thresh_params[prof].warpY << '\n';
+			}
+			else if (Board.get_state() < 7 && Board.get_state() >= 0) {
+				profile << profile_params[prof][Board.get_state()].dist << ',' << profile_params[prof][Board.get_state()].p1 << ',' << profile_params[prof][Board.get_state()].p2 << ','
+					<< profile_params[prof][Board.get_state()].minR << ',' << profile_params[prof][Board.get_state()].maxR << '\n';
+			}
+			else if (Board.get_state() == 7) {
+				profile << profile_line_params[prof].p1 << ',' << profile_line_params[prof].p2 << ',' << profile_line_params[prof].p3 << ','
+					<< profile_line_params[prof].e_p1 << ',' << profile_line_params[prof].e_p2 << '\n';
+			}
+
+
 			ifstream iprofile("profile.dat");
 			if (iprofile.good())
 			{
@@ -268,17 +306,17 @@ int main()
 				oprofile << "\n" << profile.str();
 				for (int i = 0; i < 8 - Board.get_state(); i++) // Add -, to indicate a missing field
 					if (i != 7 - Board.get_state())
-						oprofile << "-\n";
+						oprofile << "999\n";
 			}
 			else {
 				ofstream oprofile("profile.dat");
 				oprofile << profile.str();
 				for (int i = 0; i < 8 - Board.get_state(); i++) // Add -, to indicate a missing field
-					oprofile << "-\n";
+					oprofile << "999\n";
 
 			}
 			iprofile.close();
-			
+
 		}
 	}
 }

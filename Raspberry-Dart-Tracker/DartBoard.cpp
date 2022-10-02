@@ -6,35 +6,35 @@ DartBoard::DartBoard() : c_state_(-1), new_state_(true)
 {
 	for (int i = 0; i < 6; i++)
 	{
-		this->boundaries_[i] = new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) };
+		this->boundaries_.push_back(new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) });
 	}
 }
 
 cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_R)
 {
 	cv::Mat frame_gray;
+	std::vector<cv::Vec3f> circles;
 	this->frame_ = this->temp_frame_.clone();
 	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
 	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(5, 5), 2, 2);
-	cv::HoughCircles(frame_gray, this->potential_circles_, cv::HOUGH_GRADIENT, 1.3, dist, p1, p2, min_R, max_R);
+	cv::HoughCircles(frame_gray, circles, cv::HOUGH_GRADIENT, 1.1, dist, p1, p2, min_R, max_R);
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
-	cv::Vec3f inner_board;
-	for (size_t i = 0; i < this->potential_circles_.size(); i++)
+	for (size_t i = 0; i < circles.size(); i++)
 	{
-		cv::Point center(cvRound(this->potential_circles_[i][0]), cvRound(this->potential_circles_[i][1]));
+		cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
 		//int radius = cvRound(this->potential_circles_[i][2]);
 		double distance_to_center = distance_between(dartboard_center, center);
 		if (distance_to_center < smallest_dist)
 		{
 			smallest_dist = distance_to_center;
-			inner_board = this->potential_circles_[i];
+			this->outer_circle_ = circles[i];
 		}
 		
 	}
 
-	circle(this->frame_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-	circle(this->frame_, Point(cvRound(inner_board[0]), cvRound(inner_board[1])), inner_board[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), this->outer_circle_[2], cv::Scalar(0, 0, 255), 1, 8, 0);
 	//input_frame = clone;
 
 	return frame_gray;
@@ -93,31 +93,34 @@ cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv
 
 bool DartBoard::take_snapshot()
 {
-	if (this->potential_circles_.size() == 1)
-	{
-		this->dartboard_circle_ = this->potential_circles_[0];
-		cv::Point center(cvRound(dartboard_circle_[0]), cvRound(dartboard_circle_[1]));
-		int radius = cvRound(dartboard_circle_[2]);
-		cv::Mat roi(this->temp_frame_, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
-		cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
-		circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), 1);
-		this->frame_ = roi & mask;
-	}
-	else
-	{
-		std::cout << "Error: Too many circles!\n";
-	}
+
+	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
+	int radius = cvRound(this->outer_circle_[2]);
+	cv::Mat roi(this->temp_frame_, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
+	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
+	this->frame_ = roi & mask;
+	this->temp_frame_ = roi & mask;
+
 	return true;
 	
 }
 
-void DartBoard::take_perspective_transform(cv::Mat& input_frame, int warpX, int warpY)
+void DartBoard::take_perspective_transform(int warpX, int warpY)
 {
 	cv::Mat matrix = cv::getPerspectiveTransform(this->src_pnts, this->dst_pnts), warped;
 	cv::Size size(distance_between(this->src_pnts[2], this->src_pnts[1]) * (static_cast<float>(warpX) / 100), distance_between(this->src_pnts[3], this->src_pnts[2]) * (static_cast<float>(warpY)/100));
 	cv::warpPerspective(this->cam_frame_, warped, matrix, size, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 	this->frame_ = warped;
 	this->temp_frame_ = warped;
+}
+
+cv::Mat DartBoard::take_perspective_transform(int warpX, int warpY, bool)
+{
+	cv::Mat matrix = cv::getPerspectiveTransform(this->src_pnts, this->dst_pnts), warped;
+	cv::Size size(distance_between(this->src_pnts[2], this->src_pnts[1]) * (static_cast<float>(warpX) / 100), distance_between(this->src_pnts[3], this->src_pnts[2]) * (static_cast<float>(warpY) / 100));
+	cv::warpPerspective(this->cam_frame_, warped, matrix, size, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+	return warped;
 }
 
 cv::Mat& DartBoard::get_frame() { return this->frame_; }
@@ -163,7 +166,8 @@ cv::Mat DartBoard::locate_boundaries(CircleParams* params)
 
 cv::Mat DartBoard::get_frame_segments()
 {
-	Mat frame_segments = this->frame_.clone();
+	Mat frame_segments = this->temp_frame_.clone();
+
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
 	for (int i = 0; i < 6; i++)
 	{
@@ -185,7 +189,7 @@ cv::Mat DartBoard::get_frame_segments()
 			putText(frame_segments, to_string(this->segments_[i].ID), Point(priamry.x - 10, priamry.y - 5), FONT_HERSHEY_COMPLEX, 0.9, colors[i % 3], 1);
 		}
 	}
-	else
+	else if (this->c_state_ == 7)
 	{
 		for (int i = 0; i < this->lines_.size(); i++) // Draw lines
 		{
@@ -218,9 +222,10 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	morphologyEx(frame_HSV, frame_HSV, MORPH_CLOSE, kernel);
 	Canny(frame_HSV, frame_edges, e_p1, e_p2, 3); // 10, 200, 5);
 	dilate(frame_edges, frame_edges, kernel2, Point(1, -1), 1);
-	Point cent = Point(frame_edges.cols / 2, frame_edges.rows / 2);
+
 	// draw black circle middle to remove bullseye
-	circle(frame_edges, cent, 20, Scalar(0, 0, 0), FILLED, 8, 0);
+	Point cent = Point(this->get_boundary(BULLEYES_OUTER)->circ[0], this->get_boundary(BULLEYES_OUTER)->circ[1]);
+	circle(frame_edges, cent, this->get_boundary(BULLEYES_OUTER)->circ[2], Scalar(0, 0, 0), FILLED, 8, 0);
 	HoughLinesP(frame_edges, this->lines_, 1, CV_PI / 180, p1, p2, p3);
 
 	// sort lines
@@ -418,11 +423,14 @@ void DartBoard::lock_in_segment_lines()
 
 
 
-cv::Mat DartBoard::check_darts(cv::Mat input_frame)
+cv::Mat DartBoard::check_darts(int p1, int p2)
 {
-	cv::Point center(cvRound(dartboard_circle_[0]), cvRound(dartboard_circle_[1]));
-	int radius = cvRound(dartboard_circle_[2]);
-	cv::Mat roi(input_frame, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+	// need to perspective transform new input frame...
+	cv::Mat board = this->take_perspective_transform(p1, p2, bool());
+
+	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
+	int radius = cvRound(this->outer_circle_[2]);
+	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
 	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
 	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
 	return roi & mask;
@@ -445,4 +453,17 @@ bool DartBoard::state_change()
 		return true;
 	}
 	return false;
+}
+
+BoundaryCircle* DartBoard::get_boundary(TYPE t)
+{
+	for (int i = 0; i < this->boundaries_.size(); i++)
+		if (this->boundaries_[i]->type = t)
+			return this->boundaries_[i];
+	return nullptr;
+}
+
+void DartBoard::reset_segments()
+{
+	this->segments_.clear();
 }
