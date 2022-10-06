@@ -132,19 +132,21 @@ int main()
 	int* p_dist = &profile_params[prof][0].dist, * p_p1 = &profile_params[prof][0].p1, * p_p2 = &profile_params[prof][0].p2, * p_minR = &profile_params[prof][0].minR, * p_maxR = &profile_params[prof][0].maxR;
 
 	ostringstream profile;
-
+	Mat calib_frame;
 	// Main loop for getting frames & performing operations
+	cap.set(CAP_PROP_POS_FRAMES, frames - 1000);
+	//cap.set(CAP_PROP_POS_FRAMES, frames - 1);
 	while (true)
 	{
 		if (!live)// Restarts the video when it ends, not working..
 		{
 			double frame_pos = cap.get(CAP_PROP_POS_FRAMES);
-			if (frame_pos == frames)
-				cap.set(CAP_PROP_POS_FRAMES, 0);
+			if (frame_pos == frames - 500)
+				cap.set(CAP_PROP_POS_FRAMES, frames-1000);
 		}
 		
 		cap >> Board.get_cam_frame();
-		Mat calib_frame;
+		
 
 		// Calibration pipeline //
 		if (Board.get_state() == -1)
@@ -225,7 +227,7 @@ int main()
 				moveWindow("Frame Doubles", 365, 330);
 			setMouseCallback("Frame Snapshot", mouse_callback, &Board);
 		}
-		if (Board.get_state() != 8) imshow("Frame Calib", calib_frame);
+		imshow("Frame Calib", calib_frame);
 
 
 
@@ -268,8 +270,7 @@ int main()
 			else if (Board.get_state() == 8)
 			{
 				// take a picture of a dart & show it
-				Mat dart_frame = Board.check_darts(profile_thresh_params[prof].warpX, profile_thresh_params[prof].warpY);
-				imshow("Darts", dart_frame);
+				calib_frame = Board.check_darts(profile_thresh_params[prof].warpX, profile_thresh_params[prof].warpY);
 			}
 			
 		}

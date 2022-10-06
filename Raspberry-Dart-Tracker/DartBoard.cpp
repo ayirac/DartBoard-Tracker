@@ -101,6 +101,7 @@ bool DartBoard::take_snapshot()
 	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
 	this->frame_ = roi & mask;
 	this->temp_frame_ = roi & mask;
+	this->original_frame_ = roi & mask;
 
 	return true;
 	
@@ -426,14 +427,77 @@ void DartBoard::lock_in_segment_lines()
 cv::Mat DartBoard::check_darts(int p1, int p2)
 {
 	// need to perspective transform new input frame...
-	cv::Mat board = this->take_perspective_transform(p1, p2, bool());
-
+	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
 	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
 	int radius = cvRound(this->outer_circle_[2]);
 	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
 	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
 	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
-	return roi & mask;
+	cv::Mat cropped_board = roi & mask;
+	//return cropped_board;
+
+	cv::absdiff(this->original_frame_, cropped_board, difference);
+	//cv::dilate(difference, difference, Mat()); cont here, well done!
+
+	// Get the mask if difference greater than th
+	int th = 125;  // 0
+	Mat mask2(original_frame_.size(), CV_8UC1, cv::Scalar(0, 0, 0));
+	for (int j = 0; j < difference.rows; ++j) {
+		for (int i = 0; i < difference.cols; ++i) {
+			cv::Vec3b pix = difference.at<cv::Vec3b>(j, i);
+			int val = (pix[0] + pix[1] + pix[2]);
+			if (val > th) {
+				mask2.at<unsigned char>(j, i) = 255;
+			}
+		}
+	}
+	vector<vector<Point> > contours;
+	vector<Vec4i> hierarchy;
+	cv::dilate(difference, difference, Mat());
+	findContours(mask2, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+	/*
+	int contour_th = 200;
+	if (contourArea(contours[i]) < contour_th)
+	{
+		contours.erase(contours.begin() + i);
+		i--;
+	}*/
+	this->original_frame_ = cropped_board; // new board
+	if (!contours.empty())
+	{
+		int max = -999;
+		int dart_cnt;
+		Mat drawing = Mat::zeros(mask2.size(), CV_8UC3);
+
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			if (contourArea(contours[i]) > max)
+			{
+				max = contourArea(contours[i]);
+				dart_cnt = i;
+			}
+			cout << i << ": " << contourArea(contours[i]) << endl;
+		}
+		drawContours(drawing, contours, dart_cnt, Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
+		// draw western dot
+		int min = 99999;
+		Point western;
+		for (int i = 0; i < contours[dart_cnt].size(); i++)
+		{
+			if (contours[dart_cnt][i].x < min)
+			{
+				min = contours[dart_cnt][i].x;
+				western = contours[dart_cnt][i];
+			}
+		}
+
+		circle(drawing, western, 3, Scalar(0, 255, 0), -1);
+		check_hit(western);
+		return drawing;
+	}
+	return mask2;
+
+	
 
 }
 
