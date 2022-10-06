@@ -24,12 +24,21 @@
     <ClCompile Include="DartBoard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ProfileManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Library.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DartBoard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Structs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

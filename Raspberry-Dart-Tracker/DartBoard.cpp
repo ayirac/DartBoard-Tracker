@@ -5,11 +5,10 @@
 DartBoard::DartBoard() : c_state_(-1), new_state_(true)
 {
 	for (int i = 0; i < 6; i++)
-	{
 		this->boundaries_.push_back(new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) });
-	}
 }
 
+// Draws circles on the board given dist, p1, p2, minR, maxR to find the playing-area boundary circle
 cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_R)
 {
 	cv::Mat frame_gray;
@@ -35,12 +34,12 @@ cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_
 
 	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
 	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), this->outer_circle_[2], cv::Scalar(0, 0, 255), 1, 8, 0);
-	//input_frame = clone;
 
 	return frame_gray;
 }
 
-cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int thresh, int warpX, int warpY)
+// Return the original frame with four corners of on the corkboard for future perspective transformation
+cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv::Scalar highs, int warpX, int warpY)
 {
 	// HSV Range segment
 	cv::Mat hsv, thresheld, clone;
@@ -67,7 +66,6 @@ cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv
 	}
 
 	// Get contour corners (src points) & sort in order BL, TL, TR, BR & setup dst points
-	
 	if (!contours.empty())
 	{
 		std::vector<cv::Point> pnts;
@@ -91,9 +89,9 @@ cv::Mat DartBoard::locate_four_corners(cv::Mat& input_frame, cv::Scalar lows, cv
 	return thresheld;
 }
 
+// Crops out the playing-area boundary circle & saves the snapshot for checking difference for dart detection 
 bool DartBoard::take_snapshot()
 {
-
 	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
 	int radius = cvRound(this->outer_circle_[2]);
 	cv::Mat roi(this->temp_frame_, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
@@ -104,9 +102,9 @@ bool DartBoard::take_snapshot()
 	this->original_frame_ = roi & mask;
 
 	return true;
-	
 }
 
+// Warps the frame given parameters warpX & warpY
 void DartBoard::take_perspective_transform(int warpX, int warpY)
 {
 	cv::Mat matrix = cv::getPerspectiveTransform(this->src_pnts, this->dst_pnts), warped;
@@ -116,6 +114,7 @@ void DartBoard::take_perspective_transform(int warpX, int warpY)
 	this->temp_frame_ = warped;
 }
 
+// Warps the frame given parameters warpX & warpY and returns the warped frame
 cv::Mat DartBoard::take_perspective_transform(int warpX, int warpY, bool)
 {
 	cv::Mat matrix = cv::getPerspectiveTransform(this->src_pnts, this->dst_pnts), warped;
@@ -124,10 +123,13 @@ cv::Mat DartBoard::take_perspective_transform(int warpX, int warpY, bool)
 	return warped;
 }
 
+// Return the frame_;
 cv::Mat& DartBoard::get_frame() { return this->frame_; }
 
-cv::Mat DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold)
+// Locate a boundary given params & assign boundary based on current state
+cv::Mat DartBoard::locate_boundaries(CircleParams* params)
 {
+	int th = 10;
 	std::string bound_names[6] = { "BULLSEYE_INNER", "BULLEYES_OUTER", "TRIPLE_INNER", "TRIPLE_OUTER", "DOUBLE_INNER", "DOUBLE_OUTER" };
 	cv::Mat frame_dartboard_gray;
 	cv::Vec3f best_circle;
@@ -136,7 +138,7 @@ cv::Mat DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
 	cv::GaussianBlur(frame_dartboard_gray, frame_dartboard_gray, cv::Size(5, 5), 2, 2);
-	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, dist, p1, p2, min_R, max_R);
+	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR);
 	for (size_t i = 0; i < potential_bullseyes.size(); i++)
 	{
 		cv::Point center(cvRound(potential_bullseyes[i][0]), cvRound(potential_bullseyes[i][1]));
@@ -148,23 +150,17 @@ cv::Mat DartBoard::locate_boundary(int dist, int p1, int p2, int min_R, int max_
 			best_circle = potential_bullseyes[i];
 		}
 	}
-	 
-	this->boundaries_[boundary.type]->circ = best_circle;
 
-	if (smallest_dist < offcenter_threshold) // Check if the detected circle is off center
-		std::cout << bound_names[boundary.type] << " is within the threshold, distance: " << smallest_dist << std::endl;
+	this->boundaries_[this->boundaries_[c_state_-1]->type]->circ = best_circle;
+
+	if (smallest_dist < th) // Check if the detected circle is off center
+		std::cout << bound_names[this->boundaries_[c_state_ - 1]->type] << " is within the threshold, distance: " << smallest_dist << std::endl;
 	else
-		std::cout << bound_names[boundary.type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
+		std::cout << bound_names[this->boundaries_[c_state_ - 1]->type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
 	return frame_dartboard_gray;
-
 }
 
-cv::Mat DartBoard::locate_boundaries(CircleParams* params)
-{
-	return this->locate_boundary(params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR, *this->boundaries_[c_state_-1], 10);
-}
-
-
+// Returns the warped playing board with all boundaries and segments shown
 cv::Mat DartBoard::get_frame_segments()
 {
 	Mat frame_segments = this->temp_frame_.clone();
@@ -210,6 +206,7 @@ cv::Mat DartBoard::get_frame_segments()
 	return frame_segments;
 }
 
+// Locate the 20 lines on the dartboard and sort them according to their arctan2 angle for future segment creation.
 cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 {
 	// pipeline: hsv -> detect black & white
@@ -294,6 +291,7 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	return frame_edges;
 }
 
+// Check for what boundaries were hit given a Point.
 void DartBoard::check_hit(cv::Point& hit)
 {
 	// Check for multiplier/special region
@@ -376,6 +374,7 @@ void DartBoard::check_hit(cv::Point& hit)
 	
 }
 
+// Checks the playing area for a hit on a segment given a Point, and two Vec3f circles.
 bool DartBoard::segment_hit(cv::Point& hit, cv::Vec3f outer, cv::Vec3f inner)
 {
 	bool in_interior = false, in_exterior = false;
@@ -389,6 +388,7 @@ bool DartBoard::segment_hit(cv::Point& hit, cv::Vec3f outer, cv::Vec3f inner)
 	return false;
 }
 
+// Checks the playing area for a hit on a segment given a Point and one Vec3f circles, specifically for inner bullseye
 bool DartBoard::segment_hit(cv::Point& hit, cv::Vec3f outer)
 {
 	if (sqrt(pow(hit.x - outer[0], 2) + pow(hit.y - outer[1], 2)) < outer[2])
@@ -396,13 +396,14 @@ bool DartBoard::segment_hit(cv::Point& hit, cv::Vec3f outer)
 	return false;
 }
 
+// Create a segment given two line indexs & assigns the segment the correct ID
 void DartBoard::create_segment(int x, int g)
 {
 	int ccw_ids[20] = { 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6, 13, 4, 18, 1 };
 	Segment seg;
 	seg.ID = ccw_ids[this->segments_.size()];
 	seg.lines[0] = this->lines_[x];
-	if (g == this->lines_.size())
+	if (g == this->lines_.size()) // Wraps back from 1 to 20
 		seg.lines[1] = this->lines_[0];
 	else
 		seg.lines[1] = this->lines_[g];
@@ -410,6 +411,7 @@ void DartBoard::create_segment(int x, int g)
 	this->segments_.push_back(seg);
 }
 
+// Creates segments given sorted lines by merging two lines together, sets the state out of calibration mode
 void DartBoard::lock_in_segment_lines()
 {
 	if (this->lines_.size() == 20)
@@ -423,7 +425,7 @@ void DartBoard::lock_in_segment_lines()
 }
 
 
-
+// PROTOTYPING: Returns a matrix containing contours of the darts that were thrown
 cv::Mat DartBoard::check_darts(int p1, int p2)
 {
 	// need to perspective transform new input frame...
@@ -501,14 +503,17 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 
 }
 
+// Return the current state of the board
 int& DartBoard::get_state() { return this->c_state_; }
 
+// Set the state of the board & toggle new_state_
 void DartBoard::set_state(int s)
 {
 	this->c_state_ = s;
 	this->new_state_ = true;
 }
 
+// Check for a new state in the board
 bool DartBoard::state_change()
 {
 	if (this->new_state_)
@@ -519,6 +524,7 @@ bool DartBoard::state_change()
 	return false;
 }
 
+// Return a boundary given the TYPE
 BoundaryCircle* DartBoard::get_boundary(TYPE t)
 {
 	for (int i = 0; i < this->boundaries_.size(); i++)
@@ -527,6 +533,7 @@ BoundaryCircle* DartBoard::get_boundary(TYPE t)
 	return nullptr;
 }
 
+// Reset the segments
 void DartBoard::reset_segments()
 {
 	this->segments_.clear();

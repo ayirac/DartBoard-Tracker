@@ -148,10 +148,13 @@
     <ClCompile Include="DartBoard.cpp" />
     <ClCompile Include="Library.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="ProfileManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DartBoard.h" />
     <ClInclude Include="Library.h" />
+    <ClInclude Include="ProfileManager.h" />
+    <ClInclude Include="Structs.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="profiles.dat" />
