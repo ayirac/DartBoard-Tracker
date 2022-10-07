@@ -467,8 +467,9 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 	if (!contours.empty())
 	{
 		int max = -999;
-		int dart_cnt = 0;
+		//int dart_cnt = 0;
 		Mat drawing = cropped_board.clone();
+		vector<Point>* dart_contour = &contours[0];
 
 		for (size_t i = 0; i < contours.size(); i++)
 		{
@@ -481,27 +482,35 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 			if (contourArea(contours[i]) > max)
 			{
 				max = contourArea(contours[i]);
-				dart_cnt = i;
+				dart_contour = &contours[i];
 			}
 			//drawContours(drawing, contours, int(i), Scalar(0, 0, 255), 2, LINE_8, hierarchy, 0);
 			cout << i << ": " << contourArea(contours[i]) << endl;
 		}
-		drawContours(drawing, contours, dart_cnt, Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
-		// draw western dot
-		int min = 99999;
-		Point western;
-		for (int i = 0; i < contours[dart_cnt].size(); i++)
-		{
-			if (contours[dart_cnt][i].x < min)
-			{
-				min = contours[dart_cnt][i].x;
-				western = contours[dart_cnt][i];
-			}
-		}
 
-		circle(drawing, western, 3, Scalar(0, 255, 0), -1);
-		check_hit(western);
-		return drawing;
+		if (!contours.empty())
+		{
+			vector<vector<Point>> dart_container;
+			dart_container.push_back(*dart_contour);
+
+			drawContours(drawing, dart_container, int(0), Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
+			// draw western dot
+			int min = 99999;
+			Point western;
+			for (int i = 0; i < dart_contour->size(); i++)
+			{
+				if (dart_contour->at(i).x < min)
+				{
+					min = dart_contour->at(i).x;
+					western = dart_contour->at(i);
+				}
+			}
+
+			circle(drawing, western, 3, Scalar(0, 255, 0), -1);
+			check_hit(western);
+			return drawing;
+		}
+		
 	}
 
 	return mask2;
