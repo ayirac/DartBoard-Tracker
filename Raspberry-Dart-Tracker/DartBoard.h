@@ -39,7 +39,7 @@ public:
 	cv::Mat& get_frame();
 	cv::Mat& get_frame_bullseye_circles();
 	cv::Mat locate_boundary(int dist, int p1, int p2, int min_R, int max_R, BoundaryCircle& boundary, int offcenter_threshold);
-	cv::Mat locate_boundaries(CircleParams* arr);
+	cv::Mat locate_boundaries(CircleParams arr);
 	cv::Mat get_frame_segments();
 	cv::Mat locate_singles(int p1, int p2, int p3, int e_p1, int e_p2);
 	void check_hit(cv::Point& hit);

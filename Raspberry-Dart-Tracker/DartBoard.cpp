@@ -127,7 +127,7 @@ cv::Mat DartBoard::take_perspective_transform(int warpX, int warpY, bool)
 cv::Mat& DartBoard::get_frame() { return this->frame_; }
 
 // Locate a boundary given params & assign boundary based on current state
-cv::Mat DartBoard::locate_boundaries(CircleParams* params)
+cv::Mat DartBoard::locate_boundaries(CircleParams params)
 {
 	int th = 10;
 	std::string bound_names[6] = { "BULLSEYE_INNER", "BULLEYES_OUTER", "TRIPLE_INNER", "TRIPLE_OUTER", "DOUBLE_INNER", "DOUBLE_OUTER" };
@@ -138,7 +138,7 @@ cv::Mat DartBoard::locate_boundaries(CircleParams* params)
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
 	cv::GaussianBlur(frame_dartboard_gray, frame_dartboard_gray, cv::Size(5, 5), 2, 2);
-	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, params[c_state_].dist, params[c_state_].p1, params[c_state_].p2, params[c_state_].minR, params[c_state_].maxR);
+	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, params.dist, params.p1, params.p2, params.minR, params.maxR);
 	for (size_t i = 0; i < potential_bullseyes.size(); i++)
 	{
 		cv::Point center(cvRound(potential_bullseyes[i][0]), cvRound(potential_bullseyes[i][1]));
@@ -439,10 +439,10 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 	//return cropped_board;
 
 	cv::absdiff(this->original_frame_, cropped_board, difference);
-	//cv::dilate(difference, difference, Mat()); cont here, well done!
+	cv::dilate(difference, difference, Mat());
 
 	// Get the mask if difference greater than th
-	int th = 125;  // 0
+	int th = 85;  // 0
 	Mat mask2(original_frame_.size(), CV_8UC1, cv::Scalar(0, 0, 0));
 	for (int j = 0; j < difference.rows; ++j) {
 		for (int i = 0; i < difference.cols; ++i) {
@@ -455,29 +455,35 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 	}
 	vector<vector<Point> > contours;
 	vector<Vec4i> hierarchy;
-	cv::dilate(difference, difference, Mat());
+	cv::erode(difference, difference, Mat());
+	cv::medianBlur(difference, difference, 3);
+	//cv::dilate(difference, difference, Mat());
+	//cv::dilate(difference, difference, Mat());
 	findContours(mask2, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
-	/*
-	int contour_th = 200;
-	if (contourArea(contours[i]) < contour_th)
-	{
-		contours.erase(contours.begin() + i);
-		i--;
-	}*/
+	
+	int contour_th = 20;
+	
 	this->original_frame_ = cropped_board; // new board
 	if (!contours.empty())
 	{
 		int max = -999;
-		int dart_cnt;
-		Mat drawing = Mat::zeros(mask2.size(), CV_8UC3);
+		int dart_cnt = 0;
+		Mat drawing = cropped_board.clone();
 
 		for (size_t i = 0; i < contours.size(); i++)
 		{
+			if (contourArea(contours[i]) < contour_th)
+			{
+				contours.erase(contours.begin() + i);
+				i--;
+				continue;
+			}
 			if (contourArea(contours[i]) > max)
 			{
 				max = contourArea(contours[i]);
 				dart_cnt = i;
 			}
+			//drawContours(drawing, contours, int(i), Scalar(0, 0, 255), 2, LINE_8, hierarchy, 0);
 			cout << i << ": " << contourArea(contours[i]) << endl;
 		}
 		drawContours(drawing, contours, dart_cnt, Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
@@ -497,10 +503,8 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 		check_hit(western);
 		return drawing;
 	}
+
 	return mask2;
-
-	
-
 }
 
 // Return the current state of the board

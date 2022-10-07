@@ -116,15 +116,15 @@ void ProfileManager::save_state(int state)
 	if (state == -1) {
 		this->saved_states_ << this->get_thresh().thresh << ',' << this->get_thresh().lowH << ',' << this->get_thresh().lowS << ',' << this->get_thresh().lowV << ','
 			<< this->get_thresh().highH << ',' << this->get_thresh().highS << ',' << this->get_thresh().highV << ','
-			<< this->get_thresh().warpX << ',' << this->get_thresh().warpY << '\n';
+			<< this->get_thresh().warpX << ',' << this->get_thresh().warpY;
 	}
 	else if (state < 7 && state >= 0) {
-		this->saved_states_ << this->get_circle(state).dist << ',' << this->get_circle(state).p1 << ',' << this->get_circle(state).p2 << ','
-			<< this->get_circle(state).minR << ',' << this->get_circle(state).maxR << '\n';
+		this->saved_states_ << '\n' << this->get_circle(state).dist << ',' << this->get_circle(state).p1 << ',' << this->get_circle(state).p2 << ','
+			<< this->get_circle(state).minR << ',' << this->get_circle(state).maxR;
 	}
 	else if (state == 7) {
-		this->saved_states_ << this->get_line().p1 << ',' << this->get_line().p2 << ',' << this->get_line().p3 << ','
-			<< this->get_line().e_p1 << ',' << this->get_line().e_p2 << '\n';
+		this->saved_states_ << '\n' << this->get_line().p1 << ',' << this->get_line().p2 << ',' << this->get_line().p3 << ','
+			<< this->get_line().e_p1 << ',' << this->get_line().e_p2;
 	}
 }
 

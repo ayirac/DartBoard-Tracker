@@ -46,12 +46,15 @@ int main()
 	double frames = cap.get(CAP_PROP_FRAME_COUNT);
 	namedWindow("Frame", WINDOW_NORMAL);
 	namedWindow("Frame Calib", WINDOW_NORMAL);
+	namedWindow("Frame Snapshot", WINDOW_NORMAL);
 	namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
 	resizeWindow("Frame", board.get_cam_frame().cols / 3, board.get_cam_frame().rows / 3);
 	resizeWindow("Frame Calib", board.get_cam_frame().cols / 3, board.get_cam_frame().rows / 3);
+	resizeWindow("Frame Snapshot", board.get_cam_frame().cols / 3, board.get_cam_frame().rows / 3);
 	resizeWindow("Trackbar Controls", 5, 5);
 	moveWindow("Frame", 0, 0);
 	moveWindow("Frame Calib", board.get_cam_frame().cols / 3, 0);
+	moveWindow("Frame Snapshot", board.get_cam_frame().cols / 1.5, 0);
 	moveWindow("Trackbar Controls", 5, 5);
 	
 	// Load profiles
@@ -77,7 +80,7 @@ int main()
 		else if (board.get_state() == 0)
 			calib_frame = board.calibrate_board(profile_manager.get_circle(0).dist, profile_manager.get_circle(0).p1, profile_manager.get_circle(0).p2, profile_manager.get_circle(0).minR, profile_manager.get_circle(0).maxR);
 		else if (board.get_state() < 7)
-			calib_frame = board.locate_boundaries(&profile_manager.get_circle(profile_manager.get_current_profile())); // cont here, yada
+			calib_frame = board.locate_boundaries(profile_manager.get_circle(board.get_state())); // cont here, yada
 		else if (board.get_state() == 7) // locate segments
 			calib_frame = board.locate_singles(profile_manager.get_line().p1, profile_manager.get_line().p2, profile_manager.get_line().p3, profile_manager.get_line().e_p1, profile_manager.get_line().e_p2);
 
@@ -134,12 +137,12 @@ int main()
 		if (!first_calibration) 
 		{
 			first_calibration = true;
-			moveWindow("Frame Snapshot", 850, 0);
+			//moveWindow("Frame Snapshot", 850, 0);
+			//resizeWindow("Frame Snapshot", board.get_frame().cols / 3, board.get_frame().rows / 3);
 			if (board.get_state() == 6)
 				moveWindow("Frame Doubles", 365, 330);
 			setMouseCallback("Frame Snapshot", mouse_callback, &board);
 		}
-		
 
 		// Keybinds // 
 		int key_code = waitKey(20);
@@ -150,6 +153,7 @@ int main()
 			if (board.get_state() == -1) {						// Warps the dartboard to get a perfect circle
 
 				board.take_perspective_transform(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+				resizeWindow("Frame Snapshot", board.get_frame().cols / 1.5, board.get_frame().rows / 1.5);
 				board.set_state(0);
 			}
 			else if (board.get_state() == 0) {					// Isolates the dartboard playing area
