@@ -6,7 +6,7 @@ DartBoard::DartBoard() : c_state_(-1), new_state_(true), MOG_frame_target_(60), 
 {
 	for (int i = 0; i < 6; i++)
 		this->boundaries_.push_back(new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) });
-	this->MOG2_ = createBackgroundSubtractorMOG2(60, 725, true);
+	this->MOG2_ = createBackgroundSubtractorMOG2(60, 145, true);
 }
 
 // Draws circles on the board given dist, p1, p2, minR, maxR to find the playing-area boundary circle
@@ -228,18 +228,21 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	HoughLinesP(frame_edges, this->lines_, 1, CV_PI / 180, p1, p2, p3);
 
 	// sort lines
-	for (int e = 0; e < this->lines_.size() - 1; e++)
-	{
-		for (int j = 0; j < this->lines_.size() - e - 1; j++)
+	if (!this->lines_.empty()) {
+		for (int e = 0; e < this->lines_.size() - 1; e++)
 		{
-			Point dir_1 = find_further_point(Point(this->lines_[j][0], this->lines_[j][1]), Point(this->lines_[j][2], this->lines_[j][3]), // comparing j & j+1's non-origin angles, bub sort
-				Point(frame_edges.cols / 2, frame_edges.rows / 2));
-			Point dir_2 = find_further_point(Point(this->lines_[j+1][0], this->lines_[j+1][1]), Point(this->lines_[j+1][2], this->lines_[j+1][3]),
-				Point(frame_edges.cols / 2, frame_edges.rows / 2));
-			if (atan2(dir_1.x - frame_edges.cols / 2, dir_1.y - frame_edges.rows / 2) > atan2(dir_2.x - frame_edges.cols / 2, dir_2.y - frame_edges.rows / 2))
-				std::swap(this->lines_[j], this->lines_[j+1]); 
+			for (int j = 0; j < this->lines_.size() - e - 1; j++)
+			{
+				Point dir_1 = find_further_point(Point(this->lines_[j][0], this->lines_[j][1]), Point(this->lines_[j][2], this->lines_[j][3]), // comparing j & j+1's non-origin angles, bub sort
+					Point(frame_edges.cols / 2, frame_edges.rows / 2));
+				Point dir_2 = find_further_point(Point(this->lines_[j + 1][0], this->lines_[j + 1][1]), Point(this->lines_[j + 1][2], this->lines_[j + 1][3]),
+					Point(frame_edges.cols / 2, frame_edges.rows / 2));
+				if (atan2(dir_1.x - frame_edges.cols / 2, dir_1.y - frame_edges.rows / 2) > atan2(dir_2.x - frame_edges.cols / 2, dir_2.y - frame_edges.rows / 2))
+					std::swap(this->lines_[j], this->lines_[j + 1]);
+			}
 		}
 	}
+	
 
 	int max_distance_away = 30;
 	double line_angle_threshold = 0.032;
@@ -592,10 +595,10 @@ cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
 
 	cv::threshold(background_mask, thrframe, 127, 255, cv::THRESH_BINARY);
 	Mat kernel = getStructuringElement(MORPH_RECT, Size(1, 1));
-	erode(thrframe, thrframe, kernel, Point(-1, -1), 1);
-	kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+	//erode(thrframe, thrframe, kernel, Point(-1, -1), 1);
+	kernel = getStructuringElement(MORPH_RECT, Size(7, 5));
 	dilate(thrframe, thrframe, kernel, Point(-1, -1), 3);
-	kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+	kernel = getStructuringElement(MORPH_RECT, Size(3, 3));
 	erode(thrframe, thrframe, kernel, Point(-1, -1), 2);
 
 	return thrframe;

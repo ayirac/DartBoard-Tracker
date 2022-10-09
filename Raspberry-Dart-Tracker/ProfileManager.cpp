@@ -81,6 +81,14 @@ void ProfileManager::load_profile_file()
 		
 	}
 	else { // Set default values if no profile file exists
+		// Push back empty params into parameters vectors
+		this->thresh_params_.push_back(ThreshParams());
+		std::vector<CircleParams> circle_values;
+		for (int i = 0; i < 7; i++)
+			circle_values.push_back(CircleParams());
+		this->circle_params_.push_back(circle_values);
+		this->line_params_.push_back(LinesParams());
+
 		this->thresh_params_[0].thresh = 20, this->thresh_params_[0].lowH = 100, this->thresh_params_[0].lowS = 100, this->thresh_params_[0].lowV = 100,
 			this->thresh_params_[0].highH = 100, this->thresh_params_[0].highS = 100, this->thresh_params_[0].highV = 100, this->thresh_params_[0].warpX = 100, this->thresh_params_[0].warpY = 100;
 		for (int i = 0; i < 8; i++)

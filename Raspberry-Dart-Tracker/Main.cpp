@@ -63,133 +63,141 @@ int main()
 	// Main loop for getting frames & performing operations
 	int frame_start = frames - 1000, frame_end = frames - 500;
 	cap.set(CAP_PROP_POS_FRAMES, frame_start);
-	while (true)
+	try
 	{
-		if (!live)// Restarts the video when it ends, not working..
+		while (true)
 		{
-			double frame_pos = cap.get(CAP_PROP_POS_FRAMES);
-			if (frame_pos == frame_end)
-				cap.set(CAP_PROP_POS_FRAMES, frame_start);
-		}
-		cap >> board.get_cam_frame();
-		
+			if (!live)// Restarts the video when it ends, not working..
+			{
+				double frame_pos = cap.get(CAP_PROP_POS_FRAMES);
+				if (frame_pos == frame_end)
+					cap.set(CAP_PROP_POS_FRAMES, frame_start);
+			}
+			cap >> board.get_cam_frame();
 
-		// Calibration pipeline //
-		if (board.get_state() == -1)
-			calib_frame = board.locate_four_corners(board.get_cam_frame(), Scalar(profile_manager.get_thresh().lowH, profile_manager.get_thresh().lowS, profile_manager.get_thresh().lowV),
-				Scalar(Scalar(profile_manager.get_thresh().highH, profile_manager.get_thresh().highS, profile_manager.get_thresh().highV)), profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
-		else if (board.get_state() == 0)
-			calib_frame = board.calibrate_board(profile_manager.get_circle(0).dist, profile_manager.get_circle(0).p1, profile_manager.get_circle(0).p2, profile_manager.get_circle(0).minR, profile_manager.get_circle(0).maxR);
-		else if (board.get_state() < 7)
-			calib_frame = board.locate_boundaries(profile_manager.get_circle(board.get_state())); // cont here, yada
-		else if (board.get_state() == 7) // locate segments
-			calib_frame = board.locate_singles(profile_manager.get_line().p1, profile_manager.get_line().p2, profile_manager.get_line().p3, profile_manager.get_line().e_p1, profile_manager.get_line().e_p2);
-		else // Capture frames to build MOG2 background to detect darts
-			board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
 
-		// Update Trackbars //
-		if (board.state_change())
-		{
-			destroyWindow("Trackbar Controls");
-			namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
-			resizeWindow("Trackbar Controls", 300, 600);
-			moveWindow("Trackbar Controls", 0, board.get_cam_frame().rows / 2.7);
+			// Calibration pipeline //
 			if (board.get_state() == -1)
-			{
-				cv::createTrackbar("lowH", "Trackbar Controls", &profile_manager.get_thresh().lowH, max_value_H);
-				cv::createTrackbar("lowS", "Trackbar Controls", &profile_manager.get_thresh().lowS, max_value);
-				cv::createTrackbar("lowV", "Trackbar Controls", &profile_manager.get_thresh().lowV, max_value);
-				cv::createTrackbar("maxH", "Trackbar Controls", &profile_manager.get_thresh().highH, max_value_H);
-				cv::createTrackbar("maxS", "Trackbar Controls", &profile_manager.get_thresh().highS, max_value);
-				cv::createTrackbar("maxV", "Trackbar Controls", &profile_manager.get_thresh().highV, max_value);
-				cv::createTrackbar("thresh", "Trackbar Controls", &profile_manager.get_thresh().thresh, 50);
-				createTrackbar("warpX", "Trackbar Controls", &profile_manager.get_thresh().warpX, 200);
-				createTrackbar("warpY", "Trackbar Controls", &profile_manager.get_thresh().warpY, 200);
-			}
+				calib_frame = board.locate_four_corners(board.get_cam_frame(), Scalar(profile_manager.get_thresh().lowH, profile_manager.get_thresh().lowS, profile_manager.get_thresh().lowV),
+					Scalar(Scalar(profile_manager.get_thresh().highH, profile_manager.get_thresh().highS, profile_manager.get_thresh().highV)), profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+			else if (board.get_state() == 0)
+				calib_frame = board.calibrate_board(profile_manager.get_circle(0).dist, profile_manager.get_circle(0).p1, profile_manager.get_circle(0).p2, profile_manager.get_circle(0).minR, profile_manager.get_circle(0).maxR);
 			else if (board.get_state() < 7)
+				calib_frame = board.locate_boundaries(profile_manager.get_circle(board.get_state())); // cont here, yada
+			else if (board.get_state() == 7) // locate segments
+				calib_frame = board.locate_singles(profile_manager.get_line().p1, profile_manager.get_line().p2, profile_manager.get_line().p3, profile_manager.get_line().e_p1, profile_manager.get_line().e_p2);
+			else // Capture frames to build MOG2 background to detect darts
+				board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+
+			// Update Trackbars //
+			if (board.state_change())
 			{
-				createTrackbar("track_distL", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).dist, 200);
-				createTrackbar("p1", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).p1, 200);
-				createTrackbar("p2", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).p2, 200);
-				createTrackbar("minR", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).minR, 500);
-				createTrackbar("maxR", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).maxR, 600);
-				
+				destroyWindow("Trackbar Controls");
+				namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
+				resizeWindow("Trackbar Controls", 300, 600);
+				moveWindow("Trackbar Controls", 0, board.get_cam_frame().rows / 2.7);
+				if (board.get_state() == -1)
+				{
+					cv::createTrackbar("lowH", "Trackbar Controls", &profile_manager.get_thresh().lowH, max_value_H);
+					cv::createTrackbar("lowS", "Trackbar Controls", &profile_manager.get_thresh().lowS, max_value);
+					cv::createTrackbar("lowV", "Trackbar Controls", &profile_manager.get_thresh().lowV, max_value);
+					cv::createTrackbar("maxH", "Trackbar Controls", &profile_manager.get_thresh().highH, max_value_H);
+					cv::createTrackbar("maxS", "Trackbar Controls", &profile_manager.get_thresh().highS, max_value);
+					cv::createTrackbar("maxV", "Trackbar Controls", &profile_manager.get_thresh().highV, max_value);
+					cv::createTrackbar("thresh", "Trackbar Controls", &profile_manager.get_thresh().thresh, 50);
+					createTrackbar("warpX", "Trackbar Controls", &profile_manager.get_thresh().warpX, 200);
+					createTrackbar("warpY", "Trackbar Controls", &profile_manager.get_thresh().warpY, 200);
+				}
+				else if (board.get_state() < 7)
+				{
+					createTrackbar("track_distL", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).dist, 200);
+					createTrackbar("p1", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).p1, 200);
+					createTrackbar("p2", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).p2, 200);
+					createTrackbar("minR", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).minR, 500);
+					createTrackbar("maxR", "Trackbar Controls", &profile_manager.get_circle(board.get_state()).maxR, 600);
+
+				}
+				else if (board.get_state() == 7)
+				{
+					createTrackbar("edge_p1", "Trackbar Controls", &profile_manager.get_line().e_p1, 400);
+					createTrackbar("edge_p2", "Trackbar Controls", &profile_manager.get_line().e_p2, 400);
+					createTrackbar("thresh", "Trackbar Controls", &profile_manager.get_line().p1, 300);
+					createTrackbar("min len", "Trackbar Controls", &profile_manager.get_line().p2, 500);
+					createTrackbar("max gap", "Trackbar Controls", &profile_manager.get_line().p3, 300);
+				}
 			}
-			else if (board.get_state() == 7)
+
+			// Update Windows //
+			if (board.get_state() == -1)
+				imshow("Frame", board.get_frame());
+			else
+				imshow("Frame", board.get_cam_frame());
+			if (board.get_state() < 1)
+				imshow("Frame Snapshot", board.get_frame());
+			else
+				imshow("Frame Snapshot", board.get_frame_segments());
+			imshow("Frame Calib", calib_frame);
+
+			// First calibration window adjustments
+			if (!first_calibration)
 			{
-				createTrackbar("edge_p1", "Trackbar Controls", &profile_manager.get_line().e_p1, 400);
-				createTrackbar("edge_p2", "Trackbar Controls", &profile_manager.get_line().e_p2, 400);
-				createTrackbar("thresh", "Trackbar Controls", &profile_manager.get_line().p1, 300);
-				createTrackbar("min len", "Trackbar Controls", &profile_manager.get_line().p2, 500);
-				createTrackbar("max gap", "Trackbar Controls", &profile_manager.get_line().p3, 300);
+				first_calibration = true;
+				//moveWindow("Frame Snapshot", 850, 0);
+				//resizeWindow("Frame Snapshot", board.get_frame().cols / 3, board.get_frame().rows / 3);
+				if (board.get_state() == 6)
+					moveWindow("Frame Doubles", 365, 330);
+				setMouseCallback("Frame Snapshot", mouse_callback, &board);
 			}
-		}
 
-		// Update Windows //
-		if (board.get_state() == -1)
-			imshow("Frame", board.get_frame());
-		else
-			imshow("Frame", board.get_cam_frame());
-		if (board.get_state() < 1)
-			imshow("Frame Snapshot", board.get_frame());
-		else
-			imshow("Frame Snapshot", board.get_frame_segments());
-		imshow("Frame Calib", calib_frame);
-
-		// First calibration window adjustments
-		if (!first_calibration) 
-		{
-			first_calibration = true;
-			//moveWindow("Frame Snapshot", 850, 0);
-			//resizeWindow("Frame Snapshot", board.get_frame().cols / 3, board.get_frame().rows / 3);
-			if (board.get_state() == 6)
-				moveWindow("Frame Doubles", 365, 330);
-			setMouseCallback("Frame Snapshot", mouse_callback, &board);
-		}
-
-		// Keybinds // 
-		int key_code = waitKey(20);
-		if (key_code == 32) 								// 'Space' to snapshot the DartBoard during Calibration
-		{
-			profile_manager.save_state(board.get_state());		// Save the current state to current profile
-
-			if (board.get_state() == -1) {						// Warps the dartboard to get a perfect circle
-
-				board.take_perspective_transform(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
-				resizeWindow("Frame Snapshot", board.get_frame().cols / 1.5, board.get_frame().rows / 1.5);
-				board.set_state(0);
-			}
-			else if (board.get_state() == 0) {					// Isolates the dartboard playing area
-				board.take_snapshot();
-				board.set_state(1);
-			}
-			else if (board.get_state() < 7) {					// Move the state forward by one in the boundary detection states
-				board.set_state(board.get_state() + 1);
-			}
-			else if (board.get_state() == 7) {					// Sets the lines found as the dartboard's segment lines
-				board.lock_in_segment_lines();
-				board.set_state(8);
-			}
-			else if (board.get_state() == 8)					// Finds darts on the dartboard & checks for hits
+			// Keybinds // 
+			int key_code = waitKey(20);
+			if (key_code == 32) 								// 'Space' to snapshot the DartBoard during Calibration
 			{
-				
-				calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY); // Dart Detection
-				cv::Mat foreground = board.locate_dart_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
-				imshow("mask", foreground);
-			}
-			
-		}
-		else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
-			if (board.get_state() == 8)
-				board.reset_segments();
-			board.set_state(board.get_state() - 1);
-		}
-		else if (key_code == 27)							// 'esc' to exit the program
-			break;
-		else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
+				profile_manager.save_state(board.get_state());		// Save the current state to current profile
 
-			profile_manager.save_state(board.get_state());
-			profile_manager.save_profile(board.get_state());
+				if (board.get_state() == -1) {						// Warps the dartboard to get a perfect circle
+
+					board.take_perspective_transform(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+					resizeWindow("Frame Snapshot", board.get_frame().cols / 1.5, board.get_frame().rows / 1.5);
+					board.set_state(0);
+				}
+				else if (board.get_state() == 0) {					// Isolates the dartboard playing area
+					board.take_snapshot();
+					board.set_state(1);
+				}
+				else if (board.get_state() < 7) {					// Move the state forward by one in the boundary detection states
+					board.set_state(board.get_state() + 1);
+				}
+				else if (board.get_state() == 7) {					// Sets the lines found as the dartboard's segment lines
+					board.lock_in_segment_lines();
+					board.set_state(8);
+				}
+				else if (board.get_state() == 8)					// Finds darts on the dartboard & checks for hits
+				{
+
+					calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY); // Dart Detection
+					cv::Mat foreground = board.locate_dart_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+					imshow("mask", foreground);
+				}
+
+			}
+			else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
+				if (board.get_state() == 8)
+					board.reset_segments();
+				board.set_state(board.get_state() - 1);
+			}
+			else if (key_code == 27)							// 'esc' to exit the program
+				break;
+			else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
+
+				profile_manager.save_state(board.get_state());
+				profile_manager.save_profile(board.get_state());
+			}
 		}
 	}
+	catch (const cv::Exception& e)
+	{
+		cout << e.msg << endl;
+	}
+	
 }
