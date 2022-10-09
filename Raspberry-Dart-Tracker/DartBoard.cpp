@@ -2,10 +2,11 @@
 #include "Library.h"
 #include <iostream>
 
-DartBoard::DartBoard() : c_state_(-1), new_state_(true)
+DartBoard::DartBoard() : c_state_(-1), new_state_(true), MOG_frame_target_(60), MOG_frame_count_(0)
 {
 	for (int i = 0; i < 6; i++)
 		this->boundaries_.push_back(new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) });
+	this->MOG2_ = createBackgroundSubtractorMOG2(60, 725, true);
 }
 
 // Draws circles on the board given dist, p1, p2, minR, maxR to find the playing-area boundary circle
@@ -439,10 +440,11 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 	//return cropped_board;
 
 	cv::absdiff(this->original_frame_, cropped_board, difference);
+	cv::medianBlur(difference, difference, 3);
 	cv::dilate(difference, difference, Mat());
 
 	// Get the mask if difference greater than th
-	int th = 85;  // 0
+	int th = 115;  // 0
 	Mat mask2(original_frame_.size(), CV_8UC1, cv::Scalar(0, 0, 0));
 	for (int j = 0; j < difference.rows; ++j) {
 		for (int i = 0; i < difference.cols; ++i) {
@@ -456,12 +458,11 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 	vector<vector<Point> > contours;
 	vector<Vec4i> hierarchy;
 	cv::erode(difference, difference, Mat());
-	cv::medianBlur(difference, difference, 3);
 	//cv::dilate(difference, difference, Mat());
 	//cv::dilate(difference, difference, Mat());
 	findContours(mask2, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
 	
-	int contour_th = 20;
+	int min_area = 20;
 	
 	this->original_frame_ = cropped_board; // new board
 	if (!contours.empty())
@@ -473,7 +474,7 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 
 		for (size_t i = 0; i < contours.size(); i++)
 		{
-			if (contourArea(contours[i]) < contour_th)
+			if (contourArea(contours[i]) < min_area)
 			{
 				contours.erase(contours.begin() + i);
 				i--;
@@ -550,4 +551,52 @@ BoundaryCircle* DartBoard::get_boundary(TYPE t)
 void DartBoard::reset_segments()
 {
 	this->segments_.clear();
+	this->MOG_frame_count_ = 0;
+}
+
+cv::Mat DartBoard::get_playing_area(int p1, int p2)
+{
+	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
+	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
+	int radius = cvRound(this->outer_circle_[2]);
+	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
+	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
+	cv::Mat cropped_board = roi & mask;
+	return cropped_board;
+}
+
+void DartBoard::capture_MOG2(int warpX, int warpY)
+{
+	if (this->MOG_frame_count_ < this->MOG_frame_target_)
+	{
+		cv::Mat background_mask(this->get_frame().rows, this->get_frame().cols, CV_8UC1);
+		cv::Mat dartboard = this->get_playing_area(warpX, warpY);
+
+		this->MOG2_->apply(dartboard, background_mask);
+		imshow("mask", background_mask);
+		this->MOG_frame_count_++;
+	}
+	cv::Mat output(this->get_frame().rows, this->get_frame().cols, CV_8UC1);
+	this->MOG2_->getBackgroundImage(output);
+	imshow("output", output);
+}
+
+cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
+{
+	cv::Mat output(this->get_frame().rows, this->get_frame().cols, CV_8UC1), background_mask(this->get_frame().rows, this->get_frame().cols, CV_8UC1),
+		dartboard = this->get_playing_area(warpX, warpY), thrframe;
+
+	this->MOG2_->apply(dartboard, background_mask, 0);
+	this->MOG2_->getBackgroundImage(output);
+
+	cv::threshold(background_mask, thrframe, 127, 255, cv::THRESH_BINARY);
+	Mat kernel = getStructuringElement(MORPH_RECT, Size(1, 1));
+	erode(thrframe, thrframe, kernel, Point(-1, -1), 1);
+	kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+	dilate(thrframe, thrframe, kernel, Point(-1, -1), 3);
+	kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+	erode(thrframe, thrframe, kernel, Point(-1, -1), 2);
+
+	return thrframe;
 }

@@ -1,6 +1,8 @@
 #pragma once
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/video/background_segm.hpp>
+
 #include "Structs.h"
 
 
@@ -29,6 +31,8 @@ private:
 	std::vector<cv::Vec4i> lines_;
 	bool new_state_;
 	cv::Point2f src_pnts[4], dst_pnts[4];
+	cv::Ptr<cv::BackgroundSubtractor> MOG2_;
+	int MOG_frame_target_, MOG_frame_count_;
 public:
 	DartBoard();
 	cv::Mat calibrate_board(int dist, int p1, int p2, int min_R, int max_R);
@@ -54,4 +58,7 @@ public:
 	BoundaryCircle* get_boundary(TYPE t);
 	cv::Mat& get_cam_frame() { return cam_frame_; }
 	void reset_segments();
+	cv::Mat get_playing_area(int p1, int p2);
+	void capture_MOG2(int warpX, int warpY);
+	cv::Mat locate_dart_MOG2(int warpX, int warpY);
 };

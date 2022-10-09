@@ -72,6 +72,7 @@ int main()
 				cap.set(CAP_PROP_POS_FRAMES, frame_start);
 		}
 		cap >> board.get_cam_frame();
+		
 
 		// Calibration pipeline //
 		if (board.get_state() == -1)
@@ -83,6 +84,8 @@ int main()
 			calib_frame = board.locate_boundaries(profile_manager.get_circle(board.get_state())); // cont here, yada
 		else if (board.get_state() == 7) // locate segments
 			calib_frame = board.locate_singles(profile_manager.get_line().p1, profile_manager.get_line().p2, profile_manager.get_line().p3, profile_manager.get_line().e_p1, profile_manager.get_line().e_p2);
+		else // Capture frames to build MOG2 background to detect darts
+			board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
 
 		// Update Trackbars //
 		if (board.state_change())
@@ -169,7 +172,10 @@ int main()
 			}
 			else if (board.get_state() == 8)					// Finds darts on the dartboard & checks for hits
 			{
-				calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+				
+				calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY); // Dart Detection
+				cv::Mat foreground = board.locate_dart_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+				imshow("mask", foreground);
 			}
 			
 		}
@@ -177,7 +183,6 @@ int main()
 			if (board.get_state() == 8)
 				board.reset_segments();
 			board.set_state(board.get_state() - 1);
-			
 		}
 		else if (key_code == 27)							// 'esc' to exit the program
 			break;
