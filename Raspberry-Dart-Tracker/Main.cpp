@@ -28,7 +28,7 @@ int main()
 	DartBoard board;
 	ProfileManager profile_manager;
 
-	VideoCapture cap(0);
+	VideoCapture cap(5);
 	if (!cap.isOpened()) // Setup camera, if not plugged in use a pre-recorded video 'fp' for development
 	{
 		cout << "Camera not found." << endl;

@@ -34,7 +34,7 @@ cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_
 	}
 
 	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), this->outer_circle_[2], cv::Scalar(0, 0, 255), 1, 8, 0);
+	circle(this->frame_, Point(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1])), this->outer_circle_[2], cv::Scalar(0, 0, 255), 2, 8, 0);
 
 	return frame_gray;
 }
@@ -284,10 +284,11 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	}
 	
 	// pop last one & move to front
-	this->lines_.insert(this->lines_.begin(), this->lines_[this->lines_.size() - 1]);
-	this->lines_.pop_back();
-
-
+	if (!this->lines_.empty()) {
+		this->lines_.insert(this->lines_.begin(), this->lines_[this->lines_.size() - 1]);
+		this->lines_.pop_back();
+	}
+	
 	return frame_edges;
 }
 
@@ -603,7 +604,7 @@ cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
 	kernel = getStructuringElement(MORPH_RECT, Size(7, 5));
 	dilate(thrframe, thrframe, kernel, Point(-1, -1), 3);
 	kernel = getStructuringElement(MORPH_RECT, Size(5, 3));
-	erode(thrframe, thrframe, kernel, Point(-1, -1), 3);
+	erode(thrframe, thrframe, kernel, Point(-1, -1), 4);
 
 	return thrframe;
 }
