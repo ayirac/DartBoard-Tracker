@@ -513,7 +513,7 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 					western = dart_contour->at(i);
 				}
 			}
-			// cont here on main pc
+			western = Point(western.x + 2, western.y); // Offset point a little
 			circle(drawing, western, 3, Scalar(0, 255, 0), -1);
 			check_hit(western);
 			return drawing;
