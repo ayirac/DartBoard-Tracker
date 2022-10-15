@@ -91,7 +91,7 @@ void ProfileManager::load_profile_file()
 
 		this->thresh_params_[0].thresh = 20, this->thresh_params_[0].lowH = 100, this->thresh_params_[0].lowS = 100, this->thresh_params_[0].lowV = 100,
 			this->thresh_params_[0].highH = 100, this->thresh_params_[0].highS = 100, this->thresh_params_[0].highV = 100, this->thresh_params_[0].warpX = 100, this->thresh_params_[0].warpY = 100;
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < 7; i++)
 			this->circle_params_[0][i].dist = 80, this->circle_params_[0][i].p1 = 100, this->circle_params_[0][i].p2 = 120, this->circle_params_[0][i].minR = 100, this->circle_params_[0][i].maxR = 200;
 		this->line_params_[0].e_p1 = 80, this->line_params_[0].e_p2 = 80, this->line_params_[0].p1 = 100, this->line_params_[0].p2 = 120, this->line_params_[0].p3 = 120;
 		std::cout << "File not found, setting default values." << std::endl;

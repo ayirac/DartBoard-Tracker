@@ -6,7 +6,7 @@ DartBoard::DartBoard() : c_state_(-1), new_state_(true), MOG_frame_target_(60), 
 {
 	for (int i = 0; i < 6; i++)
 		this->boundaries_.push_back(new BoundaryCircle{ TYPE(i), cv::Vec3f(-1, -1, -1) });
-	this->MOG2_ = createBackgroundSubtractorMOG2(60, 145, true);
+	this->MOG2_ = createBackgroundSubtractorMOG2(60, 152, true);
 }
 
 // Draws circles on the board given dist, p1, p2, minR, maxR to find the playing-area boundary circle
@@ -154,10 +154,6 @@ cv::Mat DartBoard::locate_boundaries(CircleParams params)
 
 	this->boundaries_[this->boundaries_[c_state_-1]->type]->circ = best_circle;
 
-	if (smallest_dist < th) // Check if the detected circle is off center
-		std::cout << bound_names[this->boundaries_[c_state_ - 1]->type] << " is within the threshold, distance: " << smallest_dist << std::endl;
-	else
-		std::cout << bound_names[this->boundaries_[c_state_ - 1]->type] << " isn't in the threshold, distance: " << smallest_dist << std::endl;
 	return frame_dartboard_gray;
 }
 
@@ -432,21 +428,17 @@ void DartBoard::lock_in_segment_lines()
 // PROTOTYPING: Returns a matrix containing contours of the darts that were thrown
 cv::Mat DartBoard::check_darts(int p1, int p2)
 {
-	// need to perspective transform new input frame...
-	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
-	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
-	int radius = cvRound(this->outer_circle_[2]);
-	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
-	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
-	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
-	cv::Mat cropped_board = roi & mask;
+	// OLD need to perspective transform new input frame...
+	/*
+	
 	//return cropped_board;
 
 	cv::absdiff(this->original_frame_, cropped_board, difference);
 	cv::medianBlur(difference, difference, 3);
 	cv::dilate(difference, difference, Mat());
 
-	// Get the mask if difference greater than th
+	// OLD Get the mask if difference greater than th
+	
 	int th = 115;  // 0
 	Mat mask2(original_frame_.size(), CV_8UC1, cv::Scalar(0, 0, 0));
 	for (int j = 0; j < difference.rows; ++j) {
@@ -458,12 +450,24 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 			}
 		}
 	}
-	vector<vector<Point> > contours;
-	vector<Vec4i> hierarchy;
+	
 	cv::erode(difference, difference, Mat());
 	//cv::dilate(difference, difference, Mat());
-	//cv::dilate(difference, difference, Mat());
-	findContours(mask2, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+	//cv::dilate(difference, diffefisrence, Mat());*/
+
+	// Get ROI - replace later
+	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
+	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
+	int radius = cvRound(this->outer_circle_[2]);
+	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
+	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);
+	cv::Mat cropped_board = roi & mask;
+	vector<vector<Point> > contours;
+	vector<Vec4i> hierarchy;
+	cv::Mat foreground_mask = this->locate_dart_MOG2(p1, p2);
+
+	findContours(foreground_mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
 	
 	int min_area = 20;
 	
@@ -509,7 +513,7 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 					western = dart_contour->at(i);
 				}
 			}
-
+			// cont here on main pc
 			circle(drawing, western, 3, Scalar(0, 255, 0), -1);
 			check_hit(western);
 			return drawing;
@@ -517,7 +521,7 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 		
 	}
 
-	return mask2;
+	return foreground_mask;
 }
 
 // Return the current state of the board
@@ -598,8 +602,8 @@ cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
 	//erode(thrframe, thrframe, kernel, Point(-1, -1), 1);
 	kernel = getStructuringElement(MORPH_RECT, Size(7, 5));
 	dilate(thrframe, thrframe, kernel, Point(-1, -1), 3);
-	kernel = getStructuringElement(MORPH_RECT, Size(3, 3));
-	erode(thrframe, thrframe, kernel, Point(-1, -1), 2);
+	kernel = getStructuringElement(MORPH_RECT, Size(5, 3));
+	erode(thrframe, thrframe, kernel, Point(-1, -1), 3);
 
 	return thrframe;
 }

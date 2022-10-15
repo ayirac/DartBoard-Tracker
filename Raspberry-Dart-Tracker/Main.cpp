@@ -23,7 +23,7 @@ int main()
 	bool first_calibration = false, live = true;
 	const int max_value_H = 360 / 2;
 	const int max_value = 255;
-	string fp = "input/new.mp4";
+	string fp = "input/1.mp4";
 	Mat calib_frame;
 	DartBoard board;
 	ProfileManager profile_manager;
@@ -61,7 +61,7 @@ int main()
 	profile_manager.load_profile_file();
 
 	// Main loop for getting frames & performing operations
-	int frame_start = frames - 1000, frame_end = frames - 500;
+	int frame_start = frames - frames, frame_end = frames - 0;
 	cap.set(CAP_PROP_POS_FRAMES, frame_start);
 	try
 	{
