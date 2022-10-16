@@ -608,3 +608,17 @@ cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
 
 	return thrframe;
 }
+
+void DartBoard::start_game(Game* type, char* argv[])
+{
+	
+
+	// FixedScore game type
+	if (type == &FixedScore())
+	{
+		bool player = argv[0], doubled = argv[2];
+		int score = std::stoi(argv[1]);
+		this->game_ = new FixedScore(player, score, doubled);
+	}
+	this->game_->start(argv);
+}

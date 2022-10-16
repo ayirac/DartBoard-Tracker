@@ -2,7 +2,8 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/video/background_segm.hpp>
-
+#include "Game.h"
+#include "FixedScore.h"
 #include "Structs.h"
 
 
@@ -33,6 +34,8 @@ private:
 	cv::Point2f src_pnts[4], dst_pnts[4];
 	cv::Ptr<cv::BackgroundSubtractor> MOG2_;
 	int MOG_frame_target_, MOG_frame_count_;
+	Game* game_; // cont here <-
+	
 public:
 	DartBoard();
 	cv::Mat calibrate_board(int dist, int p1, int p2, int min_R, int max_R);
@@ -61,4 +64,7 @@ public:
 	cv::Mat get_playing_area(int p1, int p2);
 	void capture_MOG2(int warpX, int warpY);
 	cv::Mat locate_dart_MOG2(int warpX, int warpY);
+	void start_game(Game* type, char* argv[]);
+	Game* get_game() { return game_; }
+	void game_input(int key_code);
 };

@@ -172,18 +172,52 @@ int main()
 					board.lock_in_segment_lines();
 					board.set_state(8);
 				}
-				else if (board.get_state() == 8)					// Finds darts on the dartboard & checks for hits
+				else if (board.get_state() == 8)					// Get game type info from user			
 				{
+					int numb_points;
+					string game_type;
+					Game* type;
+					char* args[4];
+					bool valid_config = false;
+
+
+					cout << "What game do you want to play? (Options: FixedScore)"; // Only one game type rn
+					cin >> game_type;
+					do
+					{
+						if (game_type == "FixedScore")
+						{
+							type = &FixedScore();
+							cout << "How many points do you want to start with for the FixedScore game? (i.e 301): ";
+							cin >> numb_points;
+							if (numb_points < 2001)
+								valid_config = true;
+						}
+
+						if (!valid_config)
+							cout << "Invalid selection, try again.\n";
+					}
+					while (!valid_config);
+
+
+					// game selected
+					board.start_game(type, args);
+					
 
 					calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY); // Dart Detection
 					cv::Mat foreground = board.locate_dart_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
 					imshow("mask", foreground);
 				}
+				else if (board.get_state() == 9) // game running
+					board.game_input(key_code);
+
 
 			}
 			else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
 				if (board.get_state() == 8)
 					board.reset_segments();
+				else if (board.get_state() == 9) // game running
+					board.game_input(key_code);
 				board.set_state(board.get_state() - 1);
 			}
 			else if (key_code == 27)							// 'esc' to exit the program
@@ -193,6 +227,7 @@ int main()
 				profile_manager.save_state(board.get_state());
 				profile_manager.save_profile(board.get_state());
 			}
+			// add r , cont ya-da for ... the 301
 		}
 	}
 	catch (const cv::Exception& e)
