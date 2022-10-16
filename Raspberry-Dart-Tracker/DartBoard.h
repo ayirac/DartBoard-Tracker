@@ -49,12 +49,12 @@ public:
 	cv::Mat locate_boundaries(CircleParams arr);
 	cv::Mat get_frame_segments();
 	cv::Mat locate_singles(int p1, int p2, int p3, int e_p1, int e_p2);
-	void check_hit(cv::Point& hit);
+	Hit check_hit(cv::Point& hit);
 	bool segment_hit(cv::Point& hit, cv::Vec3f outer, cv::Vec3f inner);
 	bool segment_hit(cv::Point& hit, cv::Vec3f outer);
 	void create_segment(int x, int g);
 	void lock_in_segment_lines();
-	cv::Mat check_darts(int p1, int p2);
+	cv::Point check_darts(int p1, int p2);
 	int& get_state();
 	void set_state(int s);
 	bool state_change();
@@ -64,7 +64,8 @@ public:
 	cv::Mat get_playing_area(int p1, int p2);
 	void capture_MOG2(int warpX, int warpY);
 	cv::Mat locate_dart_MOG2(int warpX, int warpY);
-	void start_game(Game* type, char* argv[]);
+	void start_game(Game* type, int score, int darts, bool double_in);
 	Game* get_game() { return game_; }
-	void game_input(int key_code);
+	void game_input(int key_code, int warpX, int warpY);
+	cv::Mat& get_temp_frame() { return this->temp_frame_; };
 };

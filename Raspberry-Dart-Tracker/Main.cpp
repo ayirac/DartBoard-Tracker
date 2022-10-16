@@ -2,6 +2,8 @@
 #include <opencv2/opencv.hpp>
 #include "DartBoard.h"
 #include "ProfileManager.h"
+#include "Game.h"
+
 
 
 using namespace std;
@@ -28,7 +30,7 @@ int main()
 	DartBoard board;
 	ProfileManager profile_manager;
 
-	VideoCapture cap(5);
+	VideoCapture cap(0);
 	if (!cap.isOpened()) // Setup camera, if not plugged in use a pre-recorded video 'fp' for development
 	{
 		cout << "Camera not found." << endl;
@@ -136,7 +138,13 @@ int main()
 				imshow("Frame Snapshot", board.get_frame());
 			else
 				imshow("Frame Snapshot", board.get_frame_segments());
-			imshow("Frame Calib", calib_frame);
+			if (board.get_state() < 9)
+				imshow("Frame Calib", calib_frame);
+			else {
+				if (board.get_game() != nullptr)
+					imshow("Frame Calib", calib_frame);
+			}
+			
 
 			// First calibration window adjustments
 			if (!first_calibration)
@@ -176,7 +184,7 @@ int main()
 				{
 					int numb_points;
 					string game_type;
-					Game* type;
+					Game* type = nullptr;
 					char* args[4];
 					bool valid_config = false;
 
@@ -187,7 +195,7 @@ int main()
 					{
 						if (game_type == "FixedScore")
 						{
-							type = &FixedScore();
+							type = new FixedScore();
 							cout << "How many points do you want to start with for the FixedScore game? (i.e 301): ";
 							cin >> numb_points;
 							if (numb_points < 2001)
@@ -199,25 +207,19 @@ int main()
 					}
 					while (!valid_config);
 
+					if (game_type == "FixedScore") {
 
-					// game selected
-					board.start_game(type, args);
+					}
+					board.start_game(type, numb_points, 3, true);// cont here
+					board.set_state(9);
+
 					
-
-					calib_frame = board.check_darts(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY); // Dart Detection
-					cv::Mat foreground = board.locate_dart_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
-					imshow("mask", foreground);
 				}
-				else if (board.get_state() == 9) // game running
-					board.game_input(key_code);
-
 
 			}
 			else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
 				if (board.get_state() == 8)
 					board.reset_segments();
-				else if (board.get_state() == 9) // game running
-					board.game_input(key_code);
 				board.set_state(board.get_state() - 1);
 			}
 			else if (key_code == 27)							// 'esc' to exit the program
@@ -227,7 +229,14 @@ int main()
 				profile_manager.save_state(board.get_state());
 				profile_manager.save_profile(board.get_state());
 			}
-			// add r , cont ya-da for ... the 301
+
+			if (board.get_state() == 9) { // game running
+				if (board.get_game() != nullptr) {
+					board.game_input(key_code, profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+					calib_frame = board.get_temp_frame(); // Dart Detection
+				}
+				
+			}
 		}
 	}
 	catch (const cv::Exception& e)

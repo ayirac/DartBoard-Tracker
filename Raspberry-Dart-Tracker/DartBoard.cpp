@@ -16,7 +16,7 @@ cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_
 	std::vector<cv::Vec3f> circles;
 	this->frame_ = this->temp_frame_.clone();
 	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
-	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(5, 5), 2, 2);
+	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(3, 3), 2, 2);
 	cv::HoughCircles(frame_gray, circles, cv::HOUGH_GRADIENT, 1.1, dist, p1, p2, min_R, max_R);
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
@@ -220,7 +220,7 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 
 	// draw black circle middle to remove bullseye
 	Point cent = Point(this->get_boundary(BULLEYES_OUTER)->circ[0], this->get_boundary(BULLEYES_OUTER)->circ[1]);
-	circle(frame_edges, cent, this->get_boundary(BULLEYES_OUTER)->circ[2], Scalar(0, 0, 0), FILLED, 8, 0);
+	circle(frame_edges, cent, this->get_boundary(BULLEYES_OUTER)->circ[2], Scalar(0, 0, 0), -1);
 	HoughLinesP(frame_edges, this->lines_, 1, CV_PI / 180, p1, p2, p3);
 
 	// sort lines
@@ -293,36 +293,46 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 }
 
 // Check for what boundaries were hit given a Point.
-void DartBoard::check_hit(cv::Point& hit)
+Hit DartBoard::check_hit(cv::Point& hit)
 {
 	// Check for multiplier/special region
+	Hit h;
 	cout << boolalpha;
 	bool hit_inside = false;
 	if (segment_hit(hit, this->boundaries_[TYPE::DOUBLE_OUTER]->circ, this->boundaries_[TYPE::DOUBLE_INNER]->circ))
 	{
 		cout << "Hit double: " << hit << "!\n";
 		hit_inside = true;
+		h.multiplier = 2;
 	}
 	else if (segment_hit(hit, this->boundaries_[TYPE::TRIPLE_OUTER]->circ, this->boundaries_[TYPE::TRIPLE_INNER]->circ))
 	{
 		cout << "Hit triple: " << hit << "!\n";
 		hit_inside = true;
+		h.multiplier = 3;
 	}
 	else if (segment_hit(hit, this->boundaries_[TYPE::DOUBLE_INNER]->circ, this->boundaries_[TYPE::TRIPLE_OUTER]->circ))
 	{
 		cout << "Hit outer-single:: " << hit << "!\n";
 		hit_inside = true;
+		h.multiplier = 1;
 	}
 	else if (segment_hit(hit, this->boundaries_[TYPE::TRIPLE_INNER]->circ, this->boundaries_[TYPE::BULLEYES_OUTER]->circ))
 	{
 		cout << "Hit inner-single: " << hit << "!\n";
 		hit_inside = true;
+		h.multiplier = 1;
 	}
-	else if (segment_hit(hit, this->boundaries_[TYPE::BULLEYES_OUTER]->circ, this->boundaries_[TYPE::BULLSEYE_INNER]->circ))
+	else if (segment_hit(hit, this->boundaries_[TYPE::BULLEYES_OUTER]->circ, this->boundaries_[TYPE::BULLSEYE_INNER]->circ)) {
+		h.multiplier = 1;
+		h.ID = 25;
 		cout << "Hit Green Bullseye: " << hit << "!\n";
-	else if (segment_hit(hit, this->boundaries_[TYPE::BULLSEYE_INNER]->circ))
+	}
+	else if (segment_hit(hit, this->boundaries_[TYPE::BULLSEYE_INNER]->circ)) {
+		h.multiplier = 2;
+		h.ID = 25;
 		cout << "Hit Red Bullseye: " << hit << "!\n";
-		
+	}
 
 	// Check for specific segment if hit inside (non-bullseye)
 	bool hit_segment = false;
@@ -343,8 +353,9 @@ void DartBoard::check_hit(cv::Point& hit)
 				bool under_top = (hit.y < (slope1* hit.x) + y_int1), over_bot = (hit.y > (slope2 * hit.x) + y_int2);
 				if (under_top && over_bot && (find_most_centered_point(Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), cent).x > cent.x))
 				{
-					cout << "Hmm.. hit.. " << this->segments_[i].ID << endl;
+					cout << "Hit.. " << this->segments_[i].ID << endl;
 					hit_segment = true;
+					h.ID = this->segments_[i].ID;
 					break;
 				}
 				
@@ -354,8 +365,9 @@ void DartBoard::check_hit(cv::Point& hit)
 				bool under_top = (hit.y > (slope1 * hit.x) + y_int1), over_bot = (hit.y < (slope2* hit.x) + y_int2);
 				if (under_top && over_bot && (find_most_centered_point(Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), cent).x < cent.x))
 				{
-					cout << "Hmm.. hit.. " << this->segments_[i].ID << endl;
+					cout << "Hit.. " << this->segments_[i].ID << endl;
 					hit_segment = true;
+					h.ID = this->segments_[i].ID;
 					break;
 				}
 			}
@@ -365,13 +377,21 @@ void DartBoard::check_hit(cv::Point& hit)
 		}
 		if (!hit_segment)
 		{
-			if (hit.y < cent.y)
+			if (hit.y < cent.y) {
+				h.ID = this->segments_[0].ID;
 				cout << "Hmm.. hit.. " << this->segments_[0].ID << endl;
-			if (hit.y > cent.y)
-				cout << "Hmm.. hit.. " << this->segments_[10].ID << endl;
+			}
+
+			if (hit.y > cent.y) {
+				h.ID = this->segments_[0].ID;
+				cout << "Hit.. " << this->segments_[10].ID << endl;
+			}
 		}
 		
 	}
+	if (h.ID < 0 || h.multiplier < 1)
+		return Hit(cv::Point(-1, -1), 0, 0);
+	return h;
 	
 }
 
@@ -427,7 +447,7 @@ void DartBoard::lock_in_segment_lines()
 
 
 // PROTOTYPING: Returns a matrix containing contours of the darts that were thrown
-cv::Mat DartBoard::check_darts(int p1, int p2)
+cv::Point DartBoard::check_darts(int p1, int p2)
 {
 	// OLD need to perspective transform new input frame...
 	/*
@@ -516,13 +536,14 @@ cv::Mat DartBoard::check_darts(int p1, int p2)
 			}
 			western = Point(western.x + 2, western.y); // Offset point a little
 			circle(drawing, western, 3, Scalar(0, 255, 0), -1);
-			check_hit(western);
-			return drawing;
+			this->temp_frame_ = drawing;
+			return western;
 		}
 		
 	}
 
-	return foreground_mask;
+	this->temp_frame_ = foreground_mask;
+	return Point(-1, -1);
 }
 
 // Return the current state of the board
@@ -609,16 +630,23 @@ cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)
 	return thrframe;
 }
 
-void DartBoard::start_game(Game* type, char* argv[])
+void DartBoard::start_game(Game* type, int score, int darts, bool double_in)
 {
-	
+	this->game_ = new FixedScore(score, darts, double_in);
+}
 
-	// FixedScore game type
-	if (type == &FixedScore())
-	{
-		bool player = argv[0], doubled = argv[2];
-		int score = std::stoi(argv[1]);
-		this->game_ = new FixedScore(player, score, doubled);
+void DartBoard::game_input(int key_code, int warpX, int warpY)
+{
+	if (key_code == 32) { //spc
+		cv::Point tip = this->check_darts(warpX, warpY);
+		Hit hit = check_hit(tip);
+		hit.pos = tip;
+		this->game_->score(hit);
 	}
-	this->game_->start(argv);
+	else if (key_code == 102) { // f
+
+	}
+	else if (key_code == 114) { // r
+
+	}
 }
