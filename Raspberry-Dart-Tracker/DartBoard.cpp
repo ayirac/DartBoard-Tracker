@@ -160,7 +160,17 @@ cv::Mat DartBoard::locate_boundaries(CircleParams params)
 // Returns the warped playing board with all boundaries and segments shown
 cv::Mat DartBoard::get_frame_segments()
 {
-	Mat frame_segments = this->temp_frame_.clone();
+	Mat frame_segments; 
+	// Add stats/info to the main Dart Window if at Game stage
+	if (this->c_state_ > 8) {
+		Mat empty_frame(temp_frame_.cols, temp_frame_.rows, temp_frame_.type());// = this->temp_frame_.clone();
+		putText(empty_frame, "Player0", cv::Point(empty_frame.cols * (1 / 5), empty_frame.rows * (1 / 4)), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 0, 0), 2);
+		putText(empty_frame, "Player1", cv::Point(empty_frame.cols * (3 / 5), empty_frame.rows * (1 / 4)), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 0, 0), 2);
+		cv::hconcat(this->temp_frame_, empty_frame, frame_segments);
+	}
+	else
+		frame_segments = this->temp_frame_.clone();
+
 
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
 	for (int i = 0; i < 6; i++)
@@ -172,7 +182,7 @@ cv::Mat DartBoard::get_frame_segments()
 		}
 
 	}
-	if (this->c_state_ == 8)
+	if (this->c_state_ >= 8)
 	{
 		for (int i = 0; i < this->segments_.size(); i++) // Draw segment
 		{
@@ -595,7 +605,7 @@ cv::Mat DartBoard::get_playing_area(int p1, int p2)
 	return cropped_board;
 }
 
-void DartBoard::capture_MOG2(int warpX, int warpY)
+cv::Mat DartBoard::capture_MOG2(int warpX, int warpY)
 {
 	if (this->MOG_frame_count_ < this->MOG_frame_target_)
 	{
@@ -603,12 +613,14 @@ void DartBoard::capture_MOG2(int warpX, int warpY)
 		cv::Mat dartboard = this->get_playing_area(warpX, warpY);
 
 		this->MOG2_->apply(dartboard, background_mask);
-		imshow("mask", background_mask);
+		//imshow("mask", background_mask);
 		this->MOG_frame_count_++;
+		return background_mask;
 	}
 	cv::Mat output(this->get_frame().rows, this->get_frame().cols, CV_8UC1);
 	this->MOG2_->getBackgroundImage(output);
-	imshow("output", output);
+	//imshow("output", output);
+	return output;
 }
 
 cv::Mat DartBoard::locate_dart_MOG2(int warpX, int warpY)

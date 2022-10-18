@@ -62,7 +62,7 @@ public:
 	cv::Mat& get_cam_frame() { return cam_frame_; }
 	void reset_segments();
 	cv::Mat get_playing_area(int p1, int p2);
-	void capture_MOG2(int warpX, int warpY);
+	cv::Mat capture_MOG2(int warpX, int warpY);
 	cv::Mat locate_dart_MOG2(int warpX, int warpY);
 	void start_game(Game* type, int score, int darts, bool double_in);
 	Game* get_game() { return game_; }

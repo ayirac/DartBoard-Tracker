@@ -30,7 +30,7 @@ int main()
 	DartBoard board;
 	ProfileManager profile_manager;
 
-	VideoCapture cap(0);
+	VideoCapture cap(8);
 	if (!cap.isOpened()) // Setup camera, if not plugged in use a pre-recorded video 'fp' for development
 	{
 		cout << "Camera not found." << endl;
@@ -89,15 +89,20 @@ int main()
 			else if (board.get_state() == 7) // locate segments
 				calib_frame = board.locate_singles(profile_manager.get_line().p1, profile_manager.get_line().p2, profile_manager.get_line().p3, profile_manager.get_line().e_p1, profile_manager.get_line().e_p2);
 			else // Capture frames to build MOG2 background to detect darts
-				board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+				calib_frame = board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
 
 			// Update Trackbars //
 			if (board.state_change())
 			{
-				destroyWindow("Trackbar Controls");
-				namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
-				resizeWindow("Trackbar Controls", 300, 600);
-				moveWindow("Trackbar Controls", 0, board.get_cam_frame().rows / 2.7);
+				if (board.get_state() < 8) {
+					destroyWindow("Trackbar Controls");
+					namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
+					resizeWindow("Trackbar Controls", 300, 600);
+					moveWindow("Trackbar Controls", 0, board.get_cam_frame().rows / 2.7);
+				}
+				else if (board.get_state() == 8)
+					destroyWindow("Trackbar Controls");
+				
 				if (board.get_state() == -1)
 				{
 					cv::createTrackbar("lowH", "Trackbar Controls", &profile_manager.get_thresh().lowH, max_value_H);
@@ -182,6 +187,8 @@ int main()
 				}
 				else if (board.get_state() == 8)					// Get game type info from user			
 				{
+					resizeWindow("Frame Snapshot", board.get_frame().cols / 1.5, (board.get_frame().rows / 1.5) * 2);
+					// Emasculate in Game class at a later point
 					int numb_points;
 					string game_type;
 					Game* type = nullptr;
