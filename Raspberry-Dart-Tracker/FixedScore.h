@@ -8,7 +8,6 @@ class FixedScore : public Game
 private:
 	const int STARTING_SCORE_, DART_COUNT_;
 	const bool DOUBLE_IN_;
-	int player0_score_, player1_score_;
 	int darts_thrown_;
 	bool* turn_; // NULL game not started, false p0, true p1
 	bool* victor_;

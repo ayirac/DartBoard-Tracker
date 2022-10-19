@@ -16,7 +16,7 @@ cv::Mat DartBoard::calibrate_board(int dist, int p1, int p2, int min_R, int max_
 	std::vector<cv::Vec3f> circles;
 	this->frame_ = this->temp_frame_.clone();
 	cv::cvtColor(this->frame_, frame_gray, cv::COLOR_BGR2GRAY);
-	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(3, 3), 2, 2);
+	cv::GaussianBlur(frame_gray, frame_gray, cv::Size(3, 3), 1, 1);
 	cv::HoughCircles(frame_gray, circles, cv::HOUGH_GRADIENT, 1.1, dist, p1, p2, min_R, max_R);
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
@@ -138,7 +138,7 @@ cv::Mat DartBoard::locate_boundaries(CircleParams params)
 	cv::cvtColor(this->frame_, frame_dartboard_gray, cv::COLOR_BGR2GRAY);
 	cv::Point dartboard_center = cv::Point(this->frame_.cols / 2, this->frame_.rows / 2);
 	double smallest_dist = 99999;
-	cv::GaussianBlur(frame_dartboard_gray, frame_dartboard_gray, cv::Size(5, 5), 2, 2);
+	cv::GaussianBlur(frame_dartboard_gray, frame_dartboard_gray, cv::Size(3, 3), 1, 1);
 	cv::HoughCircles(frame_dartboard_gray, potential_bullseyes, cv::HOUGH_GRADIENT, 1, params.dist, params.p1, params.p2, params.minR, params.maxR);
 	for (size_t i = 0; i < potential_bullseyes.size(); i++)
 	{
@@ -162,10 +162,21 @@ cv::Mat DartBoard::get_frame_segments()
 {
 	Mat frame_segments; 
 	// Add stats/info to the main Dart Window if at Game stage
-	if (this->c_state_ > 8) {
+	if (this->c_state_ > 8) { // cont ui/scoreboard here
 		Mat empty_frame(temp_frame_.cols, temp_frame_.rows, temp_frame_.type());// = this->temp_frame_.clone();
-		putText(empty_frame, "Player0", cv::Point(empty_frame.cols * (1 / 5), empty_frame.rows * (1 / 4)), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 0, 0), 2);
-		putText(empty_frame, "Player1", cv::Point(empty_frame.cols * (3 / 5), empty_frame.rows * (1 / 4)), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 0, 0), 2);
+		if (this->game_->get_turn())
+			putText(empty_frame, "Player0**", cv::Point(5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		else
+			putText(empty_frame, "Player0", cv::Point(5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		putText(empty_frame, "Score: " + std::to_string(game_->get_score(true)), cv::Point(5, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(true).multiplier) + "x " + to_string(this->game_->get_player_hit_record(true).ID), cv::Point(5, 5 + empty_frame.rows /8 + (getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+
+		if (!this->game_->get_turn())
+			putText(empty_frame, "Player1", cv::Point(136, empty_frame.rows/8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		else
+			putText(empty_frame, "Player1**", cv::Point(136, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		putText(empty_frame, "Score: " + std::to_string(game_->get_score(false)), cv::Point(135, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(false)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(false).multiplier) + "x " + to_string(this->game_->get_player_hit_record(false).ID), cv::Point(135, 5 + empty_frame.rows / 8 + (getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
 		cv::hconcat(this->temp_frame_, empty_frame, frame_segments);
 	}
 	else
@@ -173,9 +184,10 @@ cv::Mat DartBoard::get_frame_segments()
 
 
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
+	// Draw boundaries (circles)
 	for (int i = 0; i < 6; i++)
 	{
-		if (this->c_state_ > i) // Draw boundaries (circles)
+		if (this->c_state_ > i)
 		{
 			int val = ((i - 1) / 2) - ((pow((-1), i - 1) - 1) / -4);
 			cv::circle(frame_segments, Point(this->boundaries_[i]->circ[0], this->boundaries_[i]->circ[1]), this->boundaries_[i]->circ[2], colors[val], 2, 8, 0);
@@ -184,13 +196,15 @@ cv::Mat DartBoard::get_frame_segments()
 	}
 	if (this->c_state_ >= 8)
 	{
-		for (int i = 0; i < this->segments_.size(); i++) // Draw segment
+		// Draw segment (lines)
+		for (int i = 0; i < this->segments_.size(); i++)
 		{
-			line(frame_segments, Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][2], this->segments_[i].lines[0][3]), colors[i % 3], 3, 8);
-			line(frame_segments, Point(this->segments_[i].lines[1][0], this->segments_[i].lines[1][1]), Point(this->segments_[i].lines[1][2], this->segments_[i].lines[1][3]), colors[i % 3], 3, 8);
-			Point priamry = find_further_point(Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][2], this->segments_[i].lines[0][3]), Point(frame_segments.cols / 2, frame_segments.rows / 2));
+			line(frame_segments, Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][2], this->segments_[i].lines[0][3]), colors[2], 2, 8);
+			line(frame_segments, Point(this->segments_[i].lines[1][0], this->segments_[i].lines[1][1]), Point(this->segments_[i].lines[1][2], this->segments_[i].lines[1][3]), colors[2], 2, 8);
+			Point priamry = find_further_point(Point(this->segments_[i].lines[0][0], this->segments_[i].lines[0][1]), Point(this->segments_[i].lines[0][2], this->segments_[i].lines[0][3]), 
+				Point(this->get_boundary(BULLEYES_OUTER)->circ[0], this->get_boundary(BULLEYES_OUTER)->circ[1]));
 
-			putText(frame_segments, to_string(this->segments_[i].ID), Point(priamry.x - 10, priamry.y - 5), FONT_HERSHEY_COMPLEX, 0.9, colors[i % 3], 1);
+			putText(frame_segments, to_string(this->segments_[i].ID), Point(priamry.x - 10, priamry.y - 5), FONT_HERSHEY_COMPLEX, 0.9, Scalar(6, 6, 102), 1);
 		}
 	}
 	else if (this->c_state_ == 7)
@@ -220,7 +234,7 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	Mat frame_blur, frame_HSV, frame_threshold, frame_edges;
 	Mat kernel = Mat(5, 7, CV_8UC1);
 	Mat kernel2 = Mat(3, 3, CV_8UC1);
-	
+
 	medianBlur(this->frame_, frame_blur, 3);
 	cvtColor(frame_blur, frame_HSV, COLOR_BGR2GRAY);
 	//inRange(frame_HSV, low_bound, high_bound, frame_threshold);
@@ -385,15 +399,14 @@ Hit DartBoard::check_hit(cv::Point& hit)
 			//cout << this->segments_[i].ID << ": y = " << slope1 << "x + " << y_int1 << endl;
 			//cout << "y = " << slope2 << "x + " << y_int2 << endl;
 		}
-		if (!hit_segment)
+		if (!hit_segment) // Check 20 & 3
 		{
 			if (hit.y < cent.y) {
 				h.ID = this->segments_[0].ID;
 				cout << "Hmm.. hit.. " << this->segments_[0].ID << endl;
 			}
-
 			if (hit.y > cent.y) {
-				h.ID = this->segments_[0].ID;
+				h.ID = this->segments_[10].ID;
 				cout << "Hit.. " << this->segments_[10].ID << endl;
 			}
 		}
@@ -552,7 +565,7 @@ cv::Point DartBoard::check_darts(int p1, int p2)
 		
 	}
 
-	this->temp_frame_ = foreground_mask;
+	this->temp_frame_ = cropped_board;
 	return Point(-1, -1);
 }
 
@@ -581,7 +594,7 @@ bool DartBoard::state_change()
 BoundaryCircle* DartBoard::get_boundary(TYPE t)
 {
 	for (int i = 0; i < this->boundaries_.size(); i++)
-		if (this->boundaries_[i]->type = t)
+		if (this->boundaries_[i]->type == t)
 			return this->boundaries_[i];
 	return nullptr;
 }
@@ -597,7 +610,7 @@ cv::Mat DartBoard::get_playing_area(int p1, int p2)
 {
 	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
 	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
-	int radius = cvRound(this->outer_circle_[2]);
+	int radius = (cvRound(this->outer_circle_[2]));
 	cv::Mat roi(board, cv::Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
 	cv::Mat mask(roi.size(), roi.type(), cv::Scalar::all(0));
 	circle(mask, cv::Point(radius, radius), radius, cv::Scalar::all(255), -1);

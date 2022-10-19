@@ -99,10 +99,16 @@ int main()
 					namedWindow("Trackbar Controls", WINDOW_AUTOSIZE);
 					resizeWindow("Trackbar Controls", 300, 600);
 					moveWindow("Trackbar Controls", 0, board.get_cam_frame().rows / 2.7);
+					if (board.get_state() == 7)
+					{
+						// set this-frame_ from entire board (outer circle), to playing board (outer triple)
+						board.take_perspective_transform(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+						board.take_snapshot();
+					}
 				}
 				else if (board.get_state() == 8)
 					destroyWindow("Trackbar Controls");
-				
+
 				if (board.get_state() == -1)
 				{
 					cv::createTrackbar("lowH", "Trackbar Controls", &profile_manager.get_thresh().lowH, max_value_H);
@@ -149,7 +155,7 @@ int main()
 				if (board.get_game() != nullptr)
 					imshow("Frame Calib", calib_frame);
 			}
-			
+
 
 			// First calibration window adjustments
 			if (!first_calibration)
@@ -187,12 +193,11 @@ int main()
 				}
 				else if (board.get_state() == 8)					// Get game type info from user			
 				{
-					resizeWindow("Frame Snapshot", board.get_frame().cols / 1.5, (board.get_frame().rows / 1.5) * 2);
+					resizeWindow("Frame Snapshot", board.get_frame().cols * 3, board.get_frame().rows * 1.5);
 					// Emasculate in Game class at a later point
 					int numb_points;
 					string game_type;
-					Game* type = nullptr;
-					char* args[4];
+					Game* type = nullptr;;
 					bool valid_config = false;
 
 
@@ -211,38 +216,31 @@ int main()
 
 						if (!valid_config)
 							cout << "Invalid selection, try again.\n";
-					}
-					while (!valid_config);
+					} while (!valid_config);
 
-					if (game_type == "FixedScore") {
 
-					}
-					board.start_game(type, numb_points, 3, true);// cont here
+					board.start_game(type, numb_points, 3, false);// cont here
 					board.set_state(9);
-
-					
 				}
+				else if (board.get_state() == 9) { // game running
+					if (board.get_game() != nullptr) {
+						board.game_input(key_code, profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
+						calib_frame = board.get_temp_frame(); // Dart Detection
+					}
 
-			}
-			else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
-				if (board.get_state() == 8)
-					board.reset_segments();
-				board.set_state(board.get_state() - 1);
-			}
-			else if (key_code == 27)							// 'esc' to exit the program
-				break;
-			else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
-
-				profile_manager.save_state(board.get_state());
-				profile_manager.save_profile(board.get_state());
-			}
-
-			if (board.get_state() == 9) { // game running
-				if (board.get_game() != nullptr) {
-					board.game_input(key_code, profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
-					calib_frame = board.get_temp_frame(); // Dart Detection
 				}
-				
+				else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
+					if (board.get_state() == 8)
+						board.reset_segments();
+					board.set_state(board.get_state() - 1);
+				}
+				else if (key_code == 27)							// 'esc' to exit the program
+					break;
+				else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
+
+					profile_manager.save_state(board.get_state());
+					profile_manager.save_profile(board.get_state());
+				}
 			}
 		}
 	}

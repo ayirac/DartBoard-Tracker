@@ -67,5 +67,6 @@ public:
 	void start_game(Game* type, int score, int darts, bool double_in);
 	Game* get_game() { return game_; }
 	void game_input(int key_code, int warpX, int warpY);
-	cv::Mat& get_temp_frame() { return this->temp_frame_; };
+	cv::Mat& get_temp_frame() { return this->temp_frame_; }
+	cv::Vec3f get_outer() { return this->outer_circle_; }
 };
