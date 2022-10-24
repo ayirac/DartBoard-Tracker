@@ -91,6 +91,21 @@ int main()
 			else // Capture frames to build MOG2 background to detect darts
 				calib_frame = board.capture_MOG2(profile_manager.get_thresh().warpX, profile_manager.get_thresh().warpY);
 
+			// Game logic - note: migrate more here later
+			if (board.get_state() == 9)
+			{
+				// Check for victory status & present a message & update state
+				if (board.get_game()->get_victor() != nullptr)
+				{
+					board.set_state(10);
+					cout << "Game over! ";
+					if (!board.get_game()->get_victor())
+						cout << "Player0 wins!\n";
+					else
+						cout << "Player1 wins!\n";
+				}
+			}
+
 			// Update Trackbars //
 			if (board.state_change())
 			{
