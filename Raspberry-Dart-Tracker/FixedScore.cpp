@@ -15,48 +15,79 @@ FixedScore::FixedScore() : STARTING_SCORE_(0), DART_COUNT_(0), DOUBLE_IN_(nullpt
 }
 void FixedScore::score(Hit h)
 {
-	// Add doubled logic for in & out
-
 	darts_thrown_++;
 	std::cout << "ID: " << h.ID << " Multi: " << h.multiplier << std::endl;
 
-	
-		
-	
-	
 	if (!*this->turn_) { // Player0 turn
+		int score = this->player0_score_;
 		this->last_player0_hit_.ID = h.ID;
 		this->last_player0_hit_.multiplier = h.multiplier;
 		if (h.multiplier == 2)
 			this->player0_doubled_ = true;
-		if (this->DOUBLE_IN_) {
+		if (this->DOUBLE_IN_) { // Check if doubling in is flagged on.
 			if (this->player0_doubled_) {
-				this->player0_score_ -= h.ID * h.multiplier;
+				score -= h.ID * h.multiplier;
+				if (score < 0) // Don't update score if the player score's negative, indicating he missed his exit double
+					std::cout << "No update, missed the double required to exit: ID: " << this->player0_score_ / 2 << " Multi: 2" << std::endl;
+				else if (score == 0 && h.multiplier != 2) // Don't update, didn't hit double.
+					std::cout << "No update, missed the double required to exit: ID: " << this->player0_score_ / 2 << " Multi: 2" << std::endl;
+				else
+					this->player0_score_ = score;
 			}
 		}
-		else
-			this->player0_score_ -= h.ID * h.multiplier;
+		else // No double flag, goal is to get to 0 in one hit with any multiplier.
+		{
+			score -= h.ID * h.multiplier;
+			if (score < 0)
+				std::cout << "No update, overshot the required points to exit: Pts: " << this->player0_score_ << std::endl;
+			else
+				this->player0_score_ = score;
+		}
 	}
 	else if (*this->turn_) { // Player1 turn
+		int score = this->player1_score_;
 		this->last_player1_hit_.ID = h.ID;
 		this->last_player1_hit_.multiplier = h.multiplier;
 		if (h.multiplier == 2)
 			this->player1_doubled_ = true;
 		if (this->DOUBLE_IN_) {
 			if (this->player1_doubled_) {
-				this->player1_score_ -= h.ID * h.multiplier;
+				score -= h.ID * h.multiplier;
+				if (score < 0) // Don't update score if the player score's negative, indicating he missed his exit double
+					std::cout << "No update, missed the double required to exit: ID: " << this->player1_score_ / 2 << " Multi: 2" << std::endl;
+				else if (score == 0 && h.multiplier != 2) // Don't update, didn't hit double.
+					std::cout << "No update, missed the double required to exit: ID: " << this->player1_score_ / 2 << " Multi: 2" << std::endl;
+				else
+					this->player1_score_ = score;
 			}
 		}
-		else
-			this->player1_score_ -= h.ID * h.multiplier;
+		else // No double flag, goal is to get to 0 in one hit with any multiplier.
+		{
+			score -= h.ID * h.multiplier;
+			if (score < 0)
+				std::cout << "No update, overshot the required points to exit: Pts: " << this->player1_score_ << std::endl;
+			else
+				this->player1_score_ = score;
+		}
 	}
 	std::cout << "P0 Sc: " << this->player0_score_ << " P1 Sc: " << this->player1_score_ << std::endl;
 
-	if (darts_thrown_ + 1 > DART_COUNT_) { // Turn change
-		*this->turn_ = !*this->turn_;
-		darts_thrown_ = 0;
-		std::cout << "Turn change.\n";
+	// Check for victor
+	if (this->player0_score_ == 0)
+		victor_ = new bool(false);
+	else if (this->player1_score_ == 0)
+		victor_ = new bool(true);
+	else
+	{
+		if (darts_thrown_ + 1 > DART_COUNT_) { // Turn change
+			*this->turn_ = !*this->turn_;
+			darts_thrown_ = 0;
+			std::cout << "Turn change.\n";
+		}
 	}
+
+	
+	
 }
 
 void FixedScore::undo()
@@ -71,7 +102,7 @@ void FixedScore::reset()
 
 bool* FixedScore::get_victor()
 {
-	return nullptr;
+	return victor_;
 }
 
 // 

@@ -172,15 +172,35 @@ cv::Mat DartBoard::get_frame_segments()
 		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(true).multiplier) + "x " + to_string(this->game_->get_player_hit_record(true).ID), cv::Point(5, 5 + empty_frame.rows /8 + (getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
 
 		if (!this->game_->get_turn())
-			putText(empty_frame, "Player1", cv::Point(136, empty_frame.rows/8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+			putText(empty_frame, "Player1", cv::Point(empty_frame.cols - getTextSize("Player1", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows/8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
 		else
-			putText(empty_frame, "Player1**", cv::Point(136, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
-		putText(empty_frame, "Score: " + std::to_string(game_->get_score(false)), cv::Point(135, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(false)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
-		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(false).multiplier) + "x " + to_string(this->game_->get_player_hit_record(false).ID), cv::Point(135, 5 + empty_frame.rows / 8 + (getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+			putText(empty_frame, "Player1**", cv::Point(empty_frame.cols - getTextSize("Player1**", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		putText(empty_frame, "Score: " + std::to_string(game_->get_score(false)), cv::Point(empty_frame.cols - getTextSize("Score: " + std::to_string(game_->get_score(false)), 
+			FONT_HERSHEY_COMPLEX, 0.6, 1, 0).width - 5, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(false)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), 
+			FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(false).multiplier) + "x " + to_string(this->game_->get_player_hit_record(false).ID), 
+			cv::Point(empty_frame.cols - getTextSize("Last: " + std::to_string(this->game_->get_player_hit_record(false).multiplier) + "x " + to_string(this->game_->get_player_hit_record(false).ID), 
+			FONT_HERSHEY_COMPLEX, 0.6, 1, 0).width - 5, 5 + empty_frame.rows / 8 + (getTextSize("Last: ", FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), 
+			FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+
+		if (this->c_state_ == 10) // Game over screen
+		{
+			putText(empty_frame, "Game Over", cv::Point(empty_frame.cols/2 - getTextSize("Game Over", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width/2, empty_frame.rows/2), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+			if (game_->get_score(true) == 0)
+			{
+				putText(empty_frame, "Player0 Victory", cv::Point(empty_frame.cols / 2 - getTextSize("Player0 Victory", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width / 2, 
+					empty_frame.rows / 2 + 10 + getTextSize("Player0 Victory", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+			} else if (game_->get_score(false) == 0)
+			{
+				putText(empty_frame, "Player1 Victory", cv::Point(empty_frame.cols / 2 - getTextSize("Player1 Victory", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width / 2,
+					empty_frame.rows / 2 + 10 + getTextSize("Player1 Victory", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+			}
+		}
 		cv::hconcat(this->temp_frame_, empty_frame, frame_segments);
 	}
-	else
+	else 
 		frame_segments = this->temp_frame_.clone();
+		
 
 
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
@@ -209,6 +229,7 @@ cv::Mat DartBoard::get_frame_segments()
 	}
 	else if (this->c_state_ == 7)
 	{
+		int sum = 0;
 		for (int i = 0; i < this->lines_.size(); i++) // Draw lines
 		{
 			line(frame_segments, Point(this->lines_[i][0], this->lines_[i][1]), Point(this->lines_[i][2], this->lines_[i][3]), colors[i % 3], 3, 8);
@@ -219,9 +240,10 @@ cv::Mat DartBoard::get_frame_segments()
 			circle(frame_segments, find_most_centered_point(Point(this->lines_[i][0], this->lines_[i][1]), Point(this->lines_[i][2], this->lines_[i][3]),
 				Point(frame_segments.cols / 2, frame_segments.rows / 2)), 1, Scalar(142, 192, 71), 7, 8, 0);
 			putText(frame_segments, to_string(i), dir, FONT_HERSHEY_COMPLEX, 0.9, colors[i % 3], 1);
-			std::cout << i << ": " << atan2(dir.x - frame_segments.cols / 2, dir.y - frame_segments.rows / 2) << endl;
-
+			//Old (useful) Dedug line: std::cout << i << ": " << atan2(dir.x - frame_segments.cols / 2, dir.y - frame_segments.rows / 2) << endl;
+			sum++;
 		}
+		std::cout << "Total lines (Target 20): " << sum << std::endl;
 	}
 
 	return frame_segments;
@@ -235,6 +257,7 @@ cv::Mat DartBoard::locate_singles(int p1, int p2, int p3, int e_p1, int e_p2)
 	Mat kernel = Mat(5, 7, CV_8UC1);
 	Mat kernel2 = Mat(3, 3, CV_8UC1);
 
+	// To detect doubles better, need the "Playing" ROI, get ROI of Playing via outer triples ...
 	medianBlur(this->frame_, frame_blur, 3);
 	cvtColor(frame_blur, frame_HSV, COLOR_BGR2GRAY);
 	//inRange(frame_HSV, low_bound, high_bound, frame_threshold);

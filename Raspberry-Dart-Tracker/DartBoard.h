@@ -24,7 +24,7 @@ struct BoundaryCircle
 class DartBoard
 {
 private:
-	cv::Mat frame_, cam_frame_, temp_frame_, original_frame_;
+	cv::Mat frame_, cam_frame_, temp_frame_, original_frame_, playing_area_;
 	std::vector<Segment> segments_;
 	std::vector<BoundaryCircle*> boundaries_;
 	int c_state_; // Calibration State: Perspective, Snapshot, Bullseye_O, Bullseye_I, Triples_O, Triples_I, Doubles_O, Doubles_I, Segment LInes (-1 - 7)
