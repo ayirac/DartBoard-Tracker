@@ -1,6 +1,10 @@
 # DartBoard Tracker
 Determines the score of a dart on a dartboard, allowing two players to play different games with eachother. Utilzies the opencv c++ library.
-![](https://github.com/ayirac/DartBoard-Tracker/301-progression.gif)
+
+![]()
+<p align="center">
+  <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/301-progression.gif">
+</p>
 
 ## Features :sparkles:
 - Straightforward calibration
@@ -22,6 +26,10 @@ Only one camera is required and it should be positioned to the left and away fro
 4. The fourth step is to identify the segment lines for [1..20]
 5. The fifth and final step is entering the specific game/rules that a player wishes to play via CLI
 6. Finally, an empty Dartboard is recorded for 50 frames to generate a background image using MOG2, which is used for forground segmentation during the dart detection phase.
+
+<p align="center">
+  <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/calib-fix.gif" width="300" height="300">
+</p>
 
 ## Playing a Game :dart:
 A 'FixedScore' game of 301 was chosen specifically for this example with the double-in flag turned off.
