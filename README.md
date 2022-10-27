@@ -24,15 +24,15 @@ Only one camera is required and it should be positioned to the left and away fro
 4. The fourth step is to identify the segment lines for [1..20]
 5. The fifth and final step is entering the specific game/rules that a player wishes to play via CLI
 6. Finally, an empty Dartboard is recorded for 50 frames to generate a background image using MOG2, which is used for forground segmentation during the dart detection phase.
+#### Isolating the corkboard
 <p align="center">
   <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/fix.png">
-  <sub>Isolating the corkboard</sub>
 </p>
+
+#### Calibration pipeline for locating bullseyes, triples, doubles, and lines
+
 <p align="center">
   <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/calib-fix.gif" width="300" height="300">
-</p>
-<p align="center">
-  <sub>Calibration pipeline for locating bullseyes, triples, doubles, and lines</sub>
 </p>
 
 # Challenges Faced
