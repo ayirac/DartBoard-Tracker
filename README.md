@@ -1,18 +1,16 @@
-# DartBoard Tracker
+# DartBoard Tracker :dart:
 Determines the score of a dart on a dartboard, allowing two players to play different games with eachother. Utilzies the opencv c++ library.
-
-![]()
 <p align="center">
   <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/301-progression.gif">
+  <sub>A game of 301 between two players without doubling in</sub>
 </p>
-
 ## Features :sparkles:
 - Straightforward calibration
 - Profile system that allows for calibration settings to be saved
 - Keybinds for maniuplating state
 - Works with different lighting circumstances
 - Fixed score games such as 301 for two players, includes options for doubling in/out.
-- Simple UI utilizied to keep track of Game score/status
+- Simple UI utilizied to keep track of the current scores
 
 ## Calibration :wrench:
 ### Positioning Equipment (lights, cameras)
@@ -26,12 +24,16 @@ Only one camera is required and it should be positioned to the left and away fro
 4. The fourth step is to identify the segment lines for [1..20]
 5. The fifth and final step is entering the specific game/rules that a player wishes to play via CLI
 6. Finally, an empty Dartboard is recorded for 50 frames to generate a background image using MOG2, which is used for forground segmentation during the dart detection phase.
-
+<p align="center">
+  <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/fix.png">
+  <sub>Isolating the corkboard</sub>
+</p>
 <p align="center">
   <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/calib-fix.gif" width="300" height="300">
 </p>
-
-## Playing a Game :dart:
-A 'FixedScore' game of 301 was chosen specifically for this example with the double-in flag turned off.
+<p align="center">
+  <sub>Calibration pipeline for locating bullseyes, triples, doubles, and lines</sub>
+</p>
 
 # Motivation
+I enjoy throwing darts and creating an automatic scorer for various games sounded like a good project to tackle. After doing preliminary research into different ways of achieivng this, the opencv library had the tools I required. Putting together the project in a rough draft wasn't too difficult however, I changed implementations for specific steps to make the program as robust as possible which took a lot of time. Overall, I learned a lot about OOP, openCV, manipulating images, and software development.
