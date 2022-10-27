@@ -1,4 +1,4 @@
-<h1>DartBoard Tracker</h1>
+#DartBoard Tracker
 Tracks thrown darts at a physical dartboard and records the hit segment's ID & multiplier. A game can be selected for two players to play against, or someone can practice throwing by themselves.
 GIF showing the game<<
 
