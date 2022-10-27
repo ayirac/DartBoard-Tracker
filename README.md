@@ -3,13 +3,13 @@ Tracks thrown darts at a physical dartboard and records the hit segment's ID & m
 GIF showing the game<<
 
 <h2>Features :sparkles:</h2>
-* Straightforward calibration
-* Profile system that allows for calibration settings to be saved
-* Keybinds for maniuplating state
-* Works with different lighting circumstances
-* Fixed score games such as 301 for two players, includes options for doubling in/out.
-* Simple UI utilizied to keep track of Game score/status
-- test
+- Straightforward calibration
+- Profile system that allows for calibration settings to be saved
+- Keybinds for maniuplating state
+  * Works with different lighting circumstances
+  * Fixed score games such as 301 for two players, includes options for doubling in/out.
+  * Simple UI utilizied to keep track of Game score/status
+test
 <h2>Calibration :wrench:</h2>
 Only one camera is required and it should be positioned to the left and away from the well-lit Dartboard. Lighting is important to dampen the effects of shadows (resulting in higher dart accuracy), Dartboard light rings are perfect but placed floodlights work as well. A square corkboard behind the dartboard is required as well.
 
