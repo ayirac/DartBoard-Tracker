@@ -1,6 +1,6 @@
 # DartBoard Tracker
 Determines the score of a dart on a dartboard, allowing two players to play different games with eachother. Utilzies the opencv c++ library.
-GIF showing the game<
+![](https://github.com/ayirac/DartBoard-Tracker/301-progression.gif)
 
 ## Features :sparkles:
 - Straightforward calibration
