@@ -30,7 +30,7 @@ int main()
 	DartBoard board;
 	ProfileManager profile_manager;
 
-	VideoCapture cap(8);
+	VideoCapture cap(0);
 	if (!cap.isOpened()) // Setup camera, if not plugged in use a pre-recorded video 'fp' for development
 	{
 		cout << "Camera not found." << endl;
@@ -244,18 +244,18 @@ int main()
 					}
 
 				}
-				else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
-					if (board.get_state() == 8)
-						board.reset_segments();
-					board.set_state(board.get_state() - 1);
-				}
-				else if (key_code == 27)							// 'esc' to exit the program
-					break;
-				else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
+			}
+			else if (key_code == 102 || key_code == 707) {		// 'f' to reset the DartBoard Calibration
+				if (board.get_state() == 8)
+					board.reset_segments();
+				board.set_state(board.get_state() - 1);
+			}
+			else if (key_code == 27)							// 'esc' to exit the program
+				break;
+			else if (key_code == 115) {							// 's' to save the current calib values to the first available profile
 
-					profile_manager.save_state(board.get_state());
-					profile_manager.save_profile(board.get_state());
-				}
+				profile_manager.save_state(board.get_state());
+				profile_manager.save_profile(board.get_state());
 			}
 		}
 	}
