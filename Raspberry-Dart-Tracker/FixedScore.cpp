@@ -18,7 +18,8 @@ void FixedScore::score(Hit h)
 	darts_thrown_++;
 	std::cout << "ID: " << h.ID << " Multi: " << h.multiplier << std::endl;
 
-	if (!*this->turn_) { // Player0 turn
+	if (!this->turn_) { // Player0 turn
+		this->who_threw_last_ = 1;
 		int score = this->player0_score_;
 		this->last_player0_hit_.ID = h.ID;
 		this->last_player0_hit_.multiplier = h.multiplier;
@@ -44,7 +45,8 @@ void FixedScore::score(Hit h)
 				this->player0_score_ = score;
 		}
 	}
-	else if (*this->turn_) { // Player1 turn
+	else if (this->turn_) { // Player1 turn
+		this->who_threw_last_ = 2;
 		int score = this->player1_score_;
 		this->last_player1_hit_.ID = h.ID;
 		this->last_player1_hit_.multiplier = h.multiplier;
@@ -80,7 +82,7 @@ void FixedScore::score(Hit h)
 	else
 	{
 		if (darts_thrown_ + 1 > DART_COUNT_) { // Turn change
-			*this->turn_ = !*this->turn_;
+			this->turn_ = !this->turn_;
 			darts_thrown_ = 0;
 			std::cout << "Turn change.\n";
 		}

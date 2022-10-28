@@ -35,6 +35,7 @@ private:
 	cv::Ptr<cv::BackgroundSubtractor> MOG2_;
 	int MOG_frame_target_, MOG_frame_count_;
 	Game* game_; // cont here <-
+	std::vector<cv::Point> dart_contour_;
 	
 public:
 	DartBoard();

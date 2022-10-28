@@ -165,16 +165,16 @@ cv::Mat DartBoard::get_frame_segments()
 	if (this->c_state_ > 8) { // cont ui/scoreboard here
 		Mat empty_frame(temp_frame_.cols, temp_frame_.rows, temp_frame_.type());// = this->temp_frame_.clone();
 		if (this->game_->get_turn())
-			putText(empty_frame, "Player0**", cv::Point(5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
-		else
 			putText(empty_frame, "Player0", cv::Point(5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		else
+			putText(empty_frame, "Player0**", cv::Point(5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
 		putText(empty_frame, "Score: " + std::to_string(game_->get_score(true)), cv::Point(5, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
 		putText(empty_frame, "Last: " + std::to_string(this->game_->get_player_hit_record(true).multiplier) + "x " + to_string(this->game_->get_player_hit_record(true).ID), cv::Point(5, 5 + empty_frame.rows /8 + (getTextSize("Score: " + std::to_string(game_->get_score(true)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
 
-		if (!this->game_->get_turn())
-			putText(empty_frame, "Player1", cv::Point(empty_frame.cols - getTextSize("Player1", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows/8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+		if (this->game_->get_turn())
+			putText(empty_frame, "Player1**", cv::Point(empty_frame.cols - getTextSize("Player1", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows/8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
 		else
-			putText(empty_frame, "Player1**", cv::Point(empty_frame.cols - getTextSize("Player1**", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
+			putText(empty_frame, "Player1", cv::Point(empty_frame.cols - getTextSize("Player1**", FONT_HERSHEY_COMPLEX, 0.7, 2, 0).width - 5, empty_frame.rows / 8), FONT_HERSHEY_COMPLEX, 0.7, Scalar(255, 0, 0), 2);
 		putText(empty_frame, "Score: " + std::to_string(game_->get_score(false)), cv::Point(empty_frame.cols - getTextSize("Score: " + std::to_string(game_->get_score(false)), 
 			FONT_HERSHEY_COMPLEX, 0.6, 1, 0).width - 5, 5 + empty_frame.rows / 8 + getTextSize("Score: " + std::to_string(game_->get_score(false)), FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height), 
 			FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
@@ -182,6 +182,18 @@ cv::Mat DartBoard::get_frame_segments()
 			cv::Point(empty_frame.cols - getTextSize("Last: " + std::to_string(this->game_->get_player_hit_record(false).multiplier) + "x " + to_string(this->game_->get_player_hit_record(false).ID), 
 			FONT_HERSHEY_COMPLEX, 0.6, 1, 0).width - 5, 5 + empty_frame.rows / 8 + (getTextSize("Last: ", FONT_HERSHEY_COMPLEX, 0.6, 2, 0).height) * 2), 
 			FONT_HERSHEY_COMPLEX, 0.6, Scalar(255, 0, 0), 1);
+
+		if (this->get_game()->get_who_threw_last() != 0)
+		{
+			std::string who_got_hit;
+			if (this->get_game()->get_who_threw_last() == 1)
+				who_got_hit = "P0";
+			else if (this->get_game()->get_who_threw_last() == 2)
+				who_got_hit = "P1";
+			putText(empty_frame, who_got_hit + " hit: " + std::to_string(this->get_game()->get_last_hit().multiplier) + "x " + std::to_string(this->get_game()->get_last_hit().ID), cv::Point(empty_frame.cols/2 - empty_frame.cols/7, 
+				empty_frame.rows/2), FONT_HERSHEY_COMPLEX, 0.7, Scalar(0, 0, 255), 2);
+		}
+		
 
 		if (this->c_state_ == 10) // Game over screen
 		{
@@ -202,7 +214,7 @@ cv::Mat DartBoard::get_frame_segments()
 		frame_segments = this->temp_frame_.clone();
 		
 
-
+	// Drawing DartBoard
 	cv::Scalar colors[3] = { Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255) };
 	// Draw boundaries (circles)
 	for (int i = 0; i < 6; i++)
@@ -244,6 +256,30 @@ cv::Mat DartBoard::get_frame_segments()
 			sum++;
 		}
 		std::cout << "Total lines (Target 20): " << sum << std::endl;
+	}
+	if (this->c_state_ == 9) // Draw darts
+	{
+		if (!this->dart_contour_.empty())
+		{
+			vector<Vec4i> hierarchy;
+			vector<vector<Point>> dart_container;
+			dart_container.push_back(this->dart_contour_);
+			drawContours(frame_segments, dart_container, int(0), Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
+
+			// Draw western dot
+			int min = 99999;
+			Point western;
+			for (int i = 0; i < this->dart_contour_.size(); i++)
+			{
+				if (this->dart_contour_.at(i).x < min)
+				{
+					min = this->dart_contour_.at(i).x;
+					western = this->dart_contour_.at(i);
+				}
+			}
+			western = Point(western.x + 1, western.y); // Offset point a little
+			circle(frame_segments, western, 3, Scalar(0, 255, 0), -1);
+		}
 	}
 
 	return frame_segments;
@@ -495,33 +531,6 @@ void DartBoard::lock_in_segment_lines()
 // PROTOTYPING: Returns a matrix containing contours of the darts that were thrown
 cv::Point DartBoard::check_darts(int p1, int p2)
 {
-	// OLD need to perspective transform new input frame...
-	/*
-	
-	//return cropped_board;
-
-	cv::absdiff(this->original_frame_, cropped_board, difference);
-	cv::medianBlur(difference, difference, 3);
-	cv::dilate(difference, difference, Mat());
-
-	// OLD Get the mask if difference greater than th
-	
-	int th = 115;  // 0
-	Mat mask2(original_frame_.size(), CV_8UC1, cv::Scalar(0, 0, 0));
-	for (int j = 0; j < difference.rows; ++j) {
-		for (int i = 0; i < difference.cols; ++i) {
-			cv::Vec3b pix = difference.at<cv::Vec3b>(j, i);
-			int val = (pix[0] + pix[1] + pix[2]);
-			if (val > th) {
-				mask2.at<unsigned char>(j, i) = 255;
-			}
-		}
-	}
-	
-	cv::erode(difference, difference, Mat());
-	//cv::dilate(difference, difference, Mat());
-	//cv::dilate(difference, diffefisrence, Mat());*/
-
 	// Get ROI - replace later
 	cv::Mat board = this->take_perspective_transform(p1, p2, bool()), difference;
 	cv::Point center(cvRound(this->outer_circle_[0]), cvRound(this->outer_circle_[1]));
@@ -544,7 +553,7 @@ cv::Point DartBoard::check_darts(int p1, int p2)
 		int max = -999;
 		//int dart_cnt = 0;
 		Mat drawing = cropped_board.clone();
-		vector<Point>* dart_contour = &contours[0];
+		vector<Point> dart_contour = contours[0];
 
 		for (size_t i = 0; i < contours.size(); i++)
 		{
@@ -557,35 +566,36 @@ cv::Point DartBoard::check_darts(int p1, int p2)
 			if (contourArea(contours[i]) > max)
 			{
 				max = contourArea(contours[i]);
-				dart_contour = &contours[i];
+				dart_contour = contours[i];
 			}
 			//drawContours(drawing, contours, int(i), Scalar(0, 0, 255), 2, LINE_8, hierarchy, 0);
 			cout << i << ": " << contourArea(contours[i]) << endl;
 		}
+		// add to class
+		this->dart_contour_ = dart_contour;
 
 		if (!contours.empty())
 		{
 			vector<vector<Point>> dart_container;
-			dart_container.push_back(*dart_contour);
+			dart_container.push_back(dart_contour);
+			//drawContours(drawing, dart_container, int(0), Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
 
-			drawContours(drawing, dart_container, int(0), Scalar(255, 0, 0), 2, LINE_8, hierarchy, 0);
-			// draw western dot
+			// Draw western dot
 			int min = 99999;
 			Point western;
-			for (int i = 0; i < dart_contour->size(); i++)
+			for (int i = 0; i < dart_contour.size(); i++)
 			{
-				if (dart_contour->at(i).x < min)
+				if (dart_contour.at(i).x < min)
 				{
-					min = dart_contour->at(i).x;
-					western = dart_contour->at(i);
+					min = dart_contour.at(i).x;
+					western = dart_contour.at(i);
 				}
 			}
 			western = Point(western.x + 1, western.y); // Offset point a little
-			circle(drawing, western, 3, Scalar(0, 255, 0), -1);
+			//circle(drawing, western, 3, Scalar(0, 255, 0), -1);
 			this->temp_frame_ = drawing;
 			return western;
 		}
-		
 	}
 
 	this->temp_frame_ = cropped_board;
