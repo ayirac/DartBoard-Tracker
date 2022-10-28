@@ -4,6 +4,7 @@ Determines the score of a dart on a dartboard, allowing two players to play diff
   <img src="https://github.com/ayirac/DartBoard-Tracker/blob/master/301-progression.gif">
   <sub>A game of 301 between two players without doubling in</sub>
 </p>
+
 ## Features :sparkles:
 - Straightforward calibration
 - Profile system that allows for calibration settings to be saved
